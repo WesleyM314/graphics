@@ -1,0 +1,10 @@
+{
+	"files.associations": {
+		"**/*.html": "html",
+		"**/templates/**/*.html": "django-html",
+		"**/requirements{/**,*}.{txt,in}": "pip-requirements",
+		"*.sql": "sql",
+		"lib.h": "c",
+		"vec4.h": "c"
+	}
+}
