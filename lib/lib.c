@@ -9,7 +9,27 @@
  */
 void printVec(vec4 *v)
 {
-	printf("[%.4f, %.4f, %.4f, %.4f]\n", v->x, v->y, v->z, v->w);
+	printf("[%.4f\t %.4f\t %.4f\t %.4f]\n\n", v->x, v->y, v->z, v->w);
+}
+
+/**
+ * Converts a vector struct to an array for 
+ * places where it's easier to use loops.
+ */
+void vecToArr(vec4 *v, vec4Arr arr)
+{
+	arr[0] = v->x;
+	arr[1] = v->y;
+	arr[2] = v->z;
+	arr[3] = v->w;
+}
+
+void arrToVec(vec4Arr arr, vec4 *v)
+{
+	v->x = arr[0];
+	v->y = arr[1];
+	v->z = arr[2];
+	v->w = arr[3];
 }
 
 /**
@@ -72,4 +92,60 @@ vec4 crossVec(vec4 *v, vec4 *u)
 		(v->z * u->x - v->x * u->z),
 		(v->x * u->y - v->y * u->x),
 		0.0};
+}
+
+// MATRICES
+
+void printMat(mat4 *m)
+{
+	printf("[%-10.4f %-10.4f %-10.4f %-10.4f]\n", m->x.x, m->y.x, m->z.x, m->w.x);
+	printf("[%-10.4f %-10.4f %-10.4f %-10.4f]\n", m->x.y, m->y.y, m->z.y, m->w.y);
+	printf("[%-10.4f %-10.4f %-10.4f %-10.4f]\n", m->x.z, m->y.z, m->z.z, m->w.z);
+	printf("[%-10.4f %-10.4f %-10.4f %-10.4f]\n\n", m->x.w, m->y.w, m->z.w, m->w.w);
+}
+
+void matToArr(mat4 *m, mat4Arr arr)
+{
+	
+}
+
+mat4 multScalMat(mat4 *m, float s)
+{
+	mat4 temp = {
+		multScalVec(&m->x, s),
+		multScalVec(&m->y, s),
+		multScalVec(&m->z, s),
+		multScalVec(&m->w, s),
+	};
+	return temp;
+}
+
+mat4 addMat(mat4 *m, mat4 *n)
+{
+	mat4 temp = {
+		addVec(&m->x, &n->x),
+		addVec(&m->y, &n->y),
+		addVec(&m->z, &n->z),
+		addVec(&m->w, &m->w),
+	};
+	return temp;
+}
+
+mat4 subMat(mat4 *m, mat4 *n)
+{
+	mat4 temp = {
+		subVec(&m->x, &n->x),
+		subVec(&m->y, &n->y),
+		subVec(&m->z, &n->z),
+		subVec(&m->w, &n->w),
+	};
+	return temp;
+}
+
+mat4 multMat(mat4 *m, mat4 *n)
+{
+	// vec4 v1 = {
+	// 	m->x.x * n->x.x + m->y.x * n->x.y + m->z.x * n->x.z + m->w.x * n->x.w,
+
+	// }
 }
