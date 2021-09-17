@@ -24,6 +24,10 @@ void vecToArr(vec4 *v, vec4Arr arr)
 	arr[3] = v->w;
 }
 
+/**
+ * Converts an array to a vector struct
+ * to help with some looping
+ */
 void arrToVec(vec4Arr arr, vec4 *v)
 {
 	v->x = arr[0];
@@ -85,6 +89,9 @@ float dotVec(vec4 *v, vec4 *u)
 	return (v->x * u->x) + (v->y * u->y) + (v->z * u->z) + (v->w * u->w);
 }
 
+/**
+ * Returns the cross product of two vectors
+ */
 vec4 crossVec(vec4 *v, vec4 *u)
 {
 	return (vec4){
@@ -96,6 +103,9 @@ vec4 crossVec(vec4 *v, vec4 *u)
 
 // MATRICES
 
+/**
+ * Prints a matrix
+ */
 void printMat(mat4 *m)
 {
 	printf("[%10.4f %10.4f %10.4f %10.4f]\n", m->x.x, m->y.x, m->z.x, m->w.x);
@@ -104,6 +114,10 @@ void printMat(mat4 *m)
 	printf("[%10.4f %10.4f %10.4f %10.4f]\n\n", m->x.w, m->y.w, m->z.w, m->w.w);
 }
 
+/**
+ * Converts a matrix to an array to 
+ * help with looping
+ */
 void matToArr(mat4 *m, mat4Arr arr)
 {
 	arr[0] = m->x.x;
@@ -127,6 +141,10 @@ void matToArr(mat4 *m, mat4Arr arr)
 	arr[15] = m->w.w;
 }
 
+/**
+ * Convers an array to a matrix
+ * to help with looping
+ */
 mat4 arrToMat(mat4Arr arr)
 {
 	mat4 temp = {
@@ -139,6 +157,9 @@ mat4 arrToMat(mat4Arr arr)
 	return temp;
 }
 
+/**
+ * Multiplies a matrix by a scalar value
+ */
 mat4 multScalMat(mat4 *m, float s)
 {
 	mat4 temp = {
@@ -150,6 +171,9 @@ mat4 multScalMat(mat4 *m, float s)
 	return temp;
 }
 
+/**
+ * Adds to matrixes together
+ */
 mat4 addMat(mat4 *m, mat4 *n)
 {
 	mat4 temp = {
@@ -161,6 +185,10 @@ mat4 addMat(mat4 *m, mat4 *n)
 	return temp;
 }
 
+/**
+ * Subtracts matrix n from m, 
+ * giving m - n
+ */
 mat4 subMat(mat4 *m, mat4 *n)
 {
 	mat4 temp = {
@@ -172,22 +200,18 @@ mat4 subMat(mat4 *m, mat4 *n)
 	return temp;
 }
 
+/**
+ * Multiplies two matrixes together
+ */
 mat4 multMat(mat4 *m, mat4 *n)
 {
+	// Transpose m so we can easily
+	// use dot products to get values
 	mat4 t = transpose(m);
 	mat4 r;
-	// mat4Arr t, nArr, temp;
-	// Get array versions of n and transpose(m) for
-	// easier looping
-	// matToArr(&foo, t);
-	// matToArr(n, nArr);
 
-	// // Each element in temp
-	// for(int i = 0; i < 16; i++)
-	// {
-	// 	temp[i] =
-	// }
-
+	// Use dot products of the appropriate
+	// vectors to fill values of result matrix
 	r.x.x = dotVec(&t.x, &n->x);
 	r.x.y = dotVec(&t.y, &n->x);
 	r.x.z = dotVec(&t.z, &n->x);
@@ -211,6 +235,9 @@ mat4 multMat(mat4 *m, mat4 *n)
 	return r;
 }
 
+/**
+ * Transposes a matrix
+ */
 mat4 transpose(mat4 *m)
 {
 	mat4 temp = {
@@ -222,7 +249,9 @@ mat4 transpose(mat4 *m)
 	return temp;
 }
 
-//TODO
+/**
+ * Get the inverse of a matrix
+ */
 mat4 invMat(mat4 *m)
 {
 	// Identity matrix
@@ -247,6 +276,9 @@ mat4 invMat(mat4 *m)
 	return invM;
 }
 
+/**
+ * Get the matrix of a minor as outlined in slides
+ */
 mat4 minorMat(mat4 *m)
 {
 	mat4Arr mArr;
@@ -286,6 +318,9 @@ mat4 minorMat(mat4 *m)
 	return arrToMat(minor);
 }
 
+/**
+ * Get the cofactor matrix as outlined in the slides
+ */
 mat4 cofactor(mat4 *m)
 {
 	mat4 r = *m;
@@ -304,6 +339,10 @@ mat4 cofactor(mat4 *m)
 	return r;
 }
 
+/**
+ * Get the determinant of a 3x3 matrix
+ * to help in matrix inversion
+ */
 GLfloat det3x3(GLfloat arr[])
 {
 	GLfloat r = 0;
@@ -317,6 +356,9 @@ GLfloat det3x3(GLfloat arr[])
 	return r;
 }
 
+/**
+ * Multiply a vector and a matrix together
+ */
 vec4 multMatVec(mat4 *m, vec4 *v)
 {
 	mat4 t = transpose(m);
