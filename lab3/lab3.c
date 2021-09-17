@@ -7,55 +7,101 @@
 #include <GL/glew.h>
 #include <GL/freeglut.h>
 #include <GL/freeglut_ext.h>
+#include <math.h>
+#include <stdlib.h>
 #include <stdio.h>
+#include <time.h>
 
 #include "../lib/initShader.h"
 #include "../lib/lib.h"
 
 #define BUFFER_OFFSET(offset) ((GLvoid *)(offset))
 
-// vec4 vertices[6] =
-// {{ 0.0,  0.5,  0.0, 1.0},	// top
-//  {-0.5, -0.5,  0.0, 1.0},	// bottom left
-//  { 0.5, -0.5,  0.0, 1.0},	// bottom right
-//  { 0.5,  0.8, -0.5, 1.0},	// top
-//  { 0.9,  0.0, -0.5, 1.0},	// bottom right
-//  { 0.1,  0.0, -0.5, 1.0}};	// bottom left
-
-// vec4 colors[6] =
-// {{1.0, 0.0, 0.0, 1.0},	// red   (for top)
-//  {0.0, 1.0, 0.0, 1.0},	// green (for bottom left)
-//  {0.0, 0.0, 1.0, 1.0},	// blue  (for bottom right)
-//  {0.0, 1.0, 0.0, 1.0},	// blue  (for bottom right)
-//  {0.0, 1.0, 0.0, 1.0},	// blue  (for bottom right)
-//  {0.0, 1.0, 0.0, 1.0}};	// blue  (for bottom right)
-
 vec4 *vertices;
 vec4 *colors;
 
-int num_vertices;
-int num_colors;
+int num_vertices = 0;
+int num_colors = 0;
 
-void testing(void)
+/**
+ * Draws a cone with a circular base sitting flat on the plane y = -0.5
+ * With a height of 1 and a radius of 0.5
+ */
+void drawCone(void)
 {
-    vertices = (vec4 *)malloc(sizeof(vec4) * 6);
-    colors = (vec4 *)malloc(sizeof(vec4) * 6);
-    num_vertices = 6;
-    num_colors = 6;
+    GLfloat x, z, theta, radius, height;
+    vec4 a, b, c;
 
-    vertices[0] = (vec4){0.0, 0.5, 0.0, 1.0};   // top
-    vertices[1] = (vec4){-0.5, -0.5, 0.0, 1.0}; // bottom left
-    vertices[2] = (vec4){0.5, -0.5, 0.0, 1.0};  // bottom right
-    vertices[3] = (vec4){0.5, 0.8, -0.5, 1.0};  // top
-    vertices[4] = (vec4){0.9, 0.0, -0.5, 1.0};  // bottom right
-    vertices[5] = (vec4){0.1, 0.0, -0.5, 1.0}; // bottom left
+    // Number of triangles to use in the base (and on the sides of the cone)
+    GLint numCircTriangles = 50;
 
-    colors[0] = (vec4){1.0, 0.0, 0.0, 1.0};
-    colors[1] = (vec4){0.0, 1.0, 0.0, 1.0};
-    colors[2] = (vec4){0.0, 0.0, 1.0, 1.0};
-    colors[3] = (vec4){0.0, 1.0, 0.0, 1.0};
-    colors[4] = (vec4){0.0, 1.0, 0.0, 1.0};
-    colors[5] = (vec4){0.0, 1.0, 0.0, 1.0};
+    // Allocate space for vertices
+    vertices = (vec4 *)malloc(sizeof(vec4) * 3 * numCircTriangles * 2);
+
+    // Angle of each slice of the circle
+    theta = 2 * M_PI / numCircTriangles;
+    // Radius of base
+    radius = 0.5;
+    // Height of cone
+    height = 1;
+
+    // Draw cone by making two identical circles and raising the y coordinate
+    // of the center of the second circle
+    for (int i = 0; i < numCircTriangles; i++)
+    {
+        // Circle center
+        a = (vec4){0.0, -0.5, 0.0, 1.0};
+        // Second vertex
+        x = radius * (GLfloat)cos((double)(theta * (GLfloat)i));
+        z = radius * (GLfloat)sin((double)(theta * (GLfloat)i));
+        b = (vec4){x, -0.5, z, 1.0};
+        // Third vertex, angle offset of theta
+        x = radius * (GLfloat)cos((double)((theta * (GLfloat)i) + theta));
+        z = radius * (GLfloat)sin((double)((theta * (GLfloat)i) + theta));
+        c = (vec4){x, -0.5, z, 1.0};
+
+        // Add one triangle as calculated for base
+        vertices[num_vertices++] = a;
+        vertices[num_vertices++] = b;
+        vertices[num_vertices++] = c;
+
+        // Change y value of center vertex and add another triangle
+        a.y += height;
+        vertices[num_vertices++] = a;
+        vertices[num_vertices++] = b;
+        vertices[num_vertices++] = c;
+    }
+}
+
+/**
+ * Creates a random color for every triangle currently
+ * in the vertices array
+ */
+void randColors(void)
+{
+    // Red, green, blue
+    GLfloat r, g, b;
+
+    // Allocate memory for color vectors
+    colors = (vec4 *)malloc(sizeof(vec4) * num_vertices);
+
+    // Seed random number generator
+    srand((unsigned)time(NULL));
+
+    // Loop through triangles
+    GLint num = num_vertices / 3;
+    for (int i = 0; i < num; i++)
+    {
+        // Get random values, scaling to range [0..1]
+        r = (GLfloat)rand() / (GLfloat)RAND_MAX;
+        b = (GLfloat)rand() / (GLfloat)RAND_MAX;
+        g = (GLfloat)rand() / (GLfloat)RAND_MAX;
+
+        // Add to color array 3 times to color whole triangle
+        colors[num_colors++] = (vec4){r, g, b, 1.0};
+        colors[num_colors++] = (vec4){r, g, b, 1.0};
+        colors[num_colors++] = (vec4){r, g, b, 1.0};
+    }
 }
 
 void init(void)
@@ -120,7 +166,10 @@ int main(int argc, char **argv)
     glutCreateWindow("Template");
     glewInit();
 
-    testing();
+    // testing();
+    // circleTest();
+    drawCone();
+    randColors();
 
     init();
     glutDisplayFunc(display);
