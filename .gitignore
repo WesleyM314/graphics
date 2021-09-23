@@ -1,3 +1,8 @@
+# Ignore files with no extension
+*
+!/**/
+!*.*
+
 # Prerequisites
 *.d
 
@@ -50,3 +55,5 @@ modules.order
 Module.symvers
 Mkfile.old
 dkms.conf
+
+
