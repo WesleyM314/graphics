@@ -5,6 +5,15 @@
 // VECTORS
 
 /**
+ * Vector constructor
+ */
+vec4 v4(GLfloat x, GLfloat y, GLfloat z, GLfloat w)
+{
+	vec4 v = {x, y, z, w};
+	return v;
+}
+
+/**
  * Prints a vector
  */
 void printVec(vec4 *v)
@@ -102,6 +111,15 @@ vec4 crossVec(vec4 *v, vec4 *u)
 }
 
 // MATRICES
+
+/**
+ * Matrix constructor
+ */
+mat4 m4(vec4 x, vec4 y, vec4 z, vec4 w)
+{
+	mat4 m = {x, y, z, w};
+	return m;
+}
 
 /**
  * Prints a matrix
