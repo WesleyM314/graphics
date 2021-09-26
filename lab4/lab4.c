@@ -208,7 +208,7 @@ int main(int argc, char **argv)
     glutInitDisplayMode(GLUT_RGBA | GLUT_DOUBLE | GLUT_DEPTH);
     glutInitWindowSize(512, 512);
     glutInitWindowPosition(100, 100);
-    glutCreateWindow("Template");
+    glutCreateWindow("Lab 4");
     glewInit();
 
     drawCone();
