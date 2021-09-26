@@ -40,7 +40,7 @@ GLfloat rads = 0;   // Radians to rotate around y axis
 void idle(void)
 {
     // Rotate around y axis
-    rads += 0.001;
+    rads += 0.005;
     if(rads > 2*M_PI)
     {
         rads = 0;
@@ -217,7 +217,7 @@ int main(int argc, char **argv)
     init();
     glutDisplayFunc(display);
     glutKeyboardFunc(keyboard);
-    glutReshapeFunc(reshape);
+    // glutReshapeFunc(reshape);
 
     glutIdleFunc(idle);
 
