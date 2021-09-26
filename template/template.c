@@ -16,23 +16,11 @@
 
 #define BUFFER_OFFSET( offset )   ((GLvoid*) (offset))
 
-vec4 vertices[6] =
-{{ 0.0,  0.5,  0.0, 1.0},	// top
- {-0.5, -0.5,  0.0, 1.0},	// bottom left
- { 0.5, -0.5,  0.0, 1.0},	// bottom right
- { 0.5,  0.8, -0.5, 1.0},	// top
- { 0.9,  0.0, -0.5, 1.0},	// bottom right
- { 0.1,  0.0, -0.5, 1.0}};	// bottom left
+vec4 *vertices;
+vec4 *colors;
 
-vec4 colors[6] =
-{{1.0, 0.0, 0.0, 1.0},	// red   (for top)
- {0.0, 1.0, 0.0, 1.0},	// green (for bottom left)
- {0.0, 0.0, 1.0, 1.0},	// blue  (for bottom right)
- {0.0, 1.0, 0.0, 1.0},	// blue  (for bottom right)
- {0.0, 1.0, 0.0, 1.0},	// blue  (for bottom right)
- {0.0, 1.0, 0.0, 1.0}};	// blue  (for bottom right)
-
-int num_vertices = 6;
+int num_vertices = 0;
+int num_colors = 0;
 
 void init(void)
 {
@@ -46,9 +34,9 @@ void init(void)
     GLuint buffer;
     glGenBuffers(1, &buffer);
     glBindBuffer(GL_ARRAY_BUFFER, buffer);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices) + sizeof(colors), NULL, GL_STATIC_DRAW);
-    glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(vertices), vertices);
-    glBufferSubData(GL_ARRAY_BUFFER, sizeof(vertices), sizeof(colors), colors);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(vec4) * num_vertices + sizeof(vec4) * num_colors, NULL, GL_STATIC_DRAW);
+    glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(vec4) * num_vertices, vertices);
+    glBufferSubData(GL_ARRAY_BUFFER, sizeof(vec4) * num_vertices, sizeof(vec4) * num_colors, colors);
 
     GLuint vPosition = glGetAttribLocation(program, "vPosition");
     glEnableVertexAttribArray(vPosition);
@@ -56,11 +44,11 @@ void init(void)
 
     GLuint vColor = glGetAttribLocation(program, "vColor");
     glEnableVertexAttribArray(vColor);
-    glVertexAttribPointer(vColor, 4, GL_FLOAT, GL_FALSE, 0, (GLvoid *) sizeof(vertices));
+    glVertexAttribPointer(vColor, 4, GL_FLOAT, GL_FALSE, 0, (GLvoid *)(sizeof(vec4) * num_vertices));
 
     glEnable(GL_DEPTH_TEST);
     glClearColor(0.0, 0.0, 0.0, 1.0);
-    glDepthRange(1,0);
+    glDepthRange(1, 0);
 }
 
 void display(void)

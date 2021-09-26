@@ -273,12 +273,12 @@ mat4 transpose(mat4 *m)
 mat4 invMat(mat4 *m)
 {
 	// Identity matrix
-	mat4 I = {
-		{1, 0, 0, 0},
-		{0, 1, 0, 0},
-		{0, 0, 1, 0},
-		{0, 0, 0, 1},
-	};
+	// mat4 I = {
+	// 	{1, 0, 0, 0},
+	// 	{0, 1, 0, 0},
+	// 	{0, 0, 1, 0},
+	// 	{0, 0, 0, 1},
+	// };
 
 	// Matrix of minor
 	mat4 minor = minorMat(m);
@@ -289,7 +289,7 @@ mat4 invMat(mat4 *m)
 	// Determinant of m
 	GLfloat det = m->x.x * minor.x.x - m->y.x * minor.y.x + m->z.x * minor.z.x - m->w.x * minor.w.x;
 	// Inverse of m
-	mat4 invM = multScalMat(&t, 1/det);
+	mat4 invM = multScalMat(&t, 1 / det);
 
 	return invM;
 }
@@ -386,5 +386,87 @@ vec4 multMatVec(mat4 *m, vec4 *v)
 		dotVec(&t.z, v),
 		dotVec(&t.w, v),
 	};
+	return r;
+}
+
+// AFFINE TRANSFORMATIONS
+
+/**
+ * Returns a translation matrix
+ */
+mat4 translate(GLfloat x, GLfloat y, GLfloat z)
+{
+	mat4 t = {
+		{1, 0, 0, 0},
+		{0, 1, 0, 0},
+		{0, 0, 1, 0},
+		{x, y, z, 1},
+	};
+
+	return t;
+}
+
+/**
+ * Returns a scaling matrix
+ */
+mat4 scale(GLfloat x, GLfloat y, GLfloat z)
+{
+	mat4 s = {
+		{x, 0, 0, 0},
+		{0, y, 0, 0},
+		{0, 0, z, 0},
+		{0, 0, 0, 1},
+	};
+
+	return s;
+}
+
+// ROTATIONS
+
+/**
+ * Returns matrix to rotate around x axis.
+ * Theta is in radians
+ */
+mat4 x_rotate(GLfloat theta)
+{
+	mat4 r = {
+		{1, 0, 0, 0},
+		{0, cos(theta), sin(theta), 0},
+		{0, -sin(theta), cos(theta), 0},
+		{0, 0, 0, 1},
+	};
+
+	return r;
+}
+
+/**
+ * Returns matrix to rotate around y axis.
+ * Theta is in radians
+ */
+mat4 y_rotate(GLfloat theta)
+{
+	mat4 r = {
+		{cos(theta), 0, -sin(theta), 0},
+		{0, 1, 0, 0},
+		{sin(theta), 0, cos(theta), 0},
+		{0, 0, 0, 1},
+	};
+
+	return r;
+}
+
+/**
+ * Returns matrix to rotate around z axis.
+ * Theta is in radians
+ */
+mat4 z_rotate(GLfloat theta)
+{
+	mat4 r = {
+		{cos(theta), sin(theta), 0, 0},
+		{-sin(theta), cos(theta), 0, 0},
+		{0, 0, 1, 0},
+		{0, 0, 0, 1},
+	};
+
 	return r;
 }
