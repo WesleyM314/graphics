@@ -62,3 +62,9 @@ mat4 minorMat(mat4 *m);
 mat4 cofactor(mat4 *m);
 GLfloat det3x3(GLfloat arr[]);
 vec4 multMatVec(mat4 *m, vec4 *v);
+
+mat4 translate(GLfloat x, GLfloat y, GLfloat z);
+mat4 scale(GLfloat x, GLfloat y, GLfloat z);
+mat4 x_rotate(GLfloat theta);
+mat4 y_rotate(GLfloat theta);
+mat4 z_rotate(GLfloat theta);
