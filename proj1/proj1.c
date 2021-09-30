@@ -60,15 +60,9 @@ void idle(void)
  */
 void myObject(void)
 {
-    // vertices = (vec4 *)malloc(sizeof(vec4) * 3);
-    // vertices[0] = v4(0, 0, 0, 1);
-    // vertices[1] = v4(1, 0, 0, 1);
-    // vertices[2] = v4(0, 1, 0, 1);
-    // num_vertices += 3;
-    // return;
 
     GLfloat theta, x, y, z;
-    mat4 r;
+    mat4 r, t, tr;
     // TORUS
     // Number of loop segments that make
     // up the torus
@@ -76,10 +70,13 @@ void myObject(void)
     // Number of points on each circle
     // making up loop segments
     GLint numCircPoints = 36;
+    // Number of coils in spring
+    GLint numCoils = 3;
 
     // Allocate space for vertices
-    // Each segment has numCircPoints * 2 triangles
-    vertices = (vec4 *)malloc(sizeof(vec4) * numSegments * numCircPoints * 2 * 3);
+    // Vertices in "shaft" + vertices in end caps
+    int numVerts = numSegments * numCircPoints * numCoils * 6 + 2 * 3 * numCircPoints;
+    vertices = (vec4 *)malloc(sizeof(vec4) * numVerts);
 
     // Make circle cross section for reference
     // Use unit circle for ease of coding, scale later
@@ -102,14 +99,25 @@ void myObject(void)
 
     // Rotate refCirc1 around y axis by 2 * PI / numSegments
     // to make reference for leading edge of segment
+    // Add to y to make coil
     theta = 2 * M_PI / numSegments;
     r = y_rotate(theta);
+    t = translate(0, 0.1, 0);
+    tr = multMat(&r, &t);
     for (int i = 0; i < numCircPoints; i++)
     {
-        refCirc1[i] = multMatVec(&r, &refCirc1[i]);
+        refCirc1[i] = multMatVec(&tr, &refCirc1[i]);
     }
 
-    for (int h = 0; h < numSegments; h++)
+    // User refCirc2 to make first end cap
+    for(int i = 0; i < numCircPoints; i++)
+    {
+        vertices[num_vertices++] = v4(2, 0, 0, 1);
+        vertices[num_vertices++] = refCirc2[i];
+        vertices[num_vertices++] = refCirc2[(i + 1) % numCircPoints];
+    }
+
+    for (int h = 0; h < numSegments * numCoils; h++)
     {
         // Draw triangles between refCircles to make shell
         // of segment.
@@ -127,18 +135,29 @@ void myObject(void)
         }
 
         // Rotate both ref circles about y
-        for(int i = 0; i < numCircPoints; i++)
+        for (int i = 0; i < numCircPoints; i++)
         {
-            refCirc1[i] = multMatVec(&r, &refCirc1[i]);
-            refCirc2[i] = multMatVec(&r, &refCirc2[i]);
+            refCirc1[i] = multMatVec(&tr, &refCirc1[i]);
+            refCirc2[i] = multMatVec(&tr, &refCirc2[i]);
         }
     }
 
+    // Add second end cap
+    for(int i = 0; i < numCircPoints; i++)
+    {
+        vertices[num_vertices++] = v4(2, numSegments * numCoils * 0.1, 0, 1);
+        vertices[num_vertices++] = refCirc2[(i + 1) % numCircPoints];
+        vertices[num_vertices++] = refCirc2[i];
+    }
+
+    // Translate -0.25 on y
+    t = translate(0, -0.5, 0);
     // Scale everything back down
-    mat4 s = scale(0.25, 0.25, 0.25);
+    mat4 s = scale(0.1, 0.1, 0.1);
+    tr = multMat(&t, &s);
     for (int i = 0; i < num_vertices; i++)
     {
-        vertices[i] = multMatVec(&s, &vertices[i]);
+        vertices[i] = multMatVec(&tr, &vertices[i]);
     }
 }
 
