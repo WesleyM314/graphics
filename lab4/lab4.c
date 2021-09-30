@@ -32,31 +32,35 @@ mat4 ctm = {
     {0, 0, 0, 1},
 };
 
-GLfloat rads = 0;   // Radians to rotate around y axis
+GLfloat rads = 0; // Radians to rotate around y axis
+GLboolean pause = 0;
 
 /**
  * Idle animation for cone
  */
 void idle(void)
 {
-    // Rotate around y axis
-    rads += 0.005;
-    if(rads > 2*M_PI)
+    if (!pause)
     {
-        rads = 0;
-    }
+        // Rotate around y axis
+        rads += 0.005;
+        if (rads > 2 * M_PI)
+        {
+            rads = 0;
+        }
 
-    // Get ctm
-    // ctm = z_rotate(rads);
-    mat4 a = translate(0, 0.125, 0);
-    mat4 b = z_rotate(rads);
-    mat4 c = x_rotate(rads);
-    mat4 d = translate(0, -0.125, 0);
-    mat4 e = multMat(&a, &b);
-    mat4 f = multMat(&e, &c);
-    ctm = multMat(&f, &d);
-    // Redraw
-    glutPostRedisplay();
+        // Get ctm
+        // ctm = z_rotate(rads);
+        mat4 a = translate(0, 0.125, 0);
+        mat4 b = z_rotate(rads);
+        mat4 c = x_rotate(rads);
+        mat4 d = translate(0, -0.125, 0);
+        mat4 e = multMat(&a, &b);
+        mat4 f = multMat(&e, &c);
+        ctm = multMat(&f, &d);
+        // Redraw
+        glutPostRedisplay();
+    }
 }
 
 /**
@@ -95,7 +99,6 @@ void drawCone(void)
         x = radius * (GLfloat)cos((double)((theta * (GLfloat)i) + theta));
         z = radius * (GLfloat)sin((double)((theta * (GLfloat)i) + theta));
         c = (vec4){x, -0.5, z, 1.0};
-        
 
         // Add one triangle as calculated for base
         vertices[num_vertices++] = a;
@@ -193,6 +196,8 @@ void keyboard(unsigned char key, int mousex, int mousey)
 {
     if (key == 'q')
         glutLeaveMainLoop();
+    if (key == ' ')
+        pause = !pause;
 
     //glutPostRedisplay();
 }
@@ -206,7 +211,7 @@ int main(int argc, char **argv)
 {
     glutInit(&argc, argv);
     glutInitDisplayMode(GLUT_RGBA | GLUT_DOUBLE | GLUT_DEPTH);
-    glutInitWindowSize(512, 512);
+    glutInitWindowSize(1024, 1024);
     glutInitWindowPosition(100, 100);
     glutCreateWindow("Lab 4");
     glewInit();
