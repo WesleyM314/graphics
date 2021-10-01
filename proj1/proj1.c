@@ -24,7 +24,7 @@ vec4 *colors;
 
 int num_vertices = 0;
 int num_colors = 0;
-GLboolean pause = 1;
+GLboolean pause = 0;
 
 mat4 ctm = {
     {1, 0, 0, 0},
@@ -49,7 +49,7 @@ void idle(void)
         }
 
         // Get ctm
-        ctm = x_rotate(-idleRads);
+        ctm = x_rotate(idleRads);
         // Redraw
         glutPostRedisplay();
     }
@@ -58,10 +58,10 @@ void idle(void)
 /**
  * Creates my computer generated object (sphere, torus, or spring)
  */
-void myObject(void)
+void spring(void)
 {
 
-    GLfloat theta, x, y, z;
+    GLfloat theta, x, y;
     mat4 r, t, tr;
     // TORUS
     // Number of loop segments that make
@@ -110,7 +110,7 @@ void myObject(void)
     }
 
     // User refCirc2 to make first end cap
-    for(int i = 0; i < numCircPoints; i++)
+    for (int i = 0; i < numCircPoints; i++)
     {
         vertices[num_vertices++] = v4(2, 0, 0, 1);
         vertices[num_vertices++] = refCirc2[i];
@@ -143,7 +143,7 @@ void myObject(void)
     }
 
     // Add second end cap
-    for(int i = 0; i < numCircPoints; i++)
+    for (int i = 0; i < numCircPoints; i++)
     {
         vertices[num_vertices++] = v4(2, numSegments * numCoils * 0.1, 0, 1);
         vertices[num_vertices++] = refCirc2[(i + 1) % numCircPoints];
@@ -158,6 +158,38 @@ void myObject(void)
     for (int i = 0; i < num_vertices; i++)
     {
         vertices[i] = multMatVec(&tr, &vertices[i]);
+    }
+}
+
+void fromFile(void)
+{
+    FILE *f;
+    int num = 0;
+    GLfloat sFactor = 0.007; // Scale factor
+    f = fopen("falcon.txt", "r");
+    fscanf(f, "%d", &num);
+    printf("%d\n", num);
+
+    // Allocate memory for vertices
+    vertices = (vec4 *)malloc(sizeof(vec4) * num);
+
+    // Create scaling matrix
+    mat4 s = scale(sFactor, sFactor, sFactor);
+    mat4 t = translate(0, 0, -0.4);
+    mat4 tr = multMat(&t, &s);
+
+    GLfloat x, y, z, w;
+    vec4 v;
+    for (int i = 0; i < num; i++)
+    {
+        // Read line
+        fscanf(f, "%f, %f, %f, %f", &x, &y, &z, &w);
+        v = v4(x, y, z, w);
+        // Transform
+        v = multMatVec(&tr, &v);
+
+        // Add vertice
+        vertices[num_vertices++] = v;
     }
 }
 
@@ -255,6 +287,12 @@ void reshape(int width, int height)
 
 int main(int argc, char **argv)
 {
+    if (argc != 2)
+    {
+        printf("Expected an argument: 'spring' or 'file'\n");
+        exit(0);
+    }
+
     glutInit(&argc, argv);
     glutInitDisplayMode(GLUT_RGBA | GLUT_DOUBLE | GLUT_DEPTH);
     glutInitWindowSize(1024, 1024);
@@ -262,7 +300,25 @@ int main(int argc, char **argv)
     glutCreateWindow("Template");
     glewInit();
 
-    myObject();
+    if (argc == 2)
+    {
+        if (!strcmp(argv[1], "spring"))
+        {
+            printf("Drawing spring...\n");
+            spring();
+        }
+        else if (!strcmp(argv[1], "file"))
+        {
+            printf("Loading from file...\n");
+            fromFile();
+        }
+        else
+        {
+            printf("Expected an argument: 'spring' or 'file'\n");
+            exit(0);
+        }
+    }
+
     randColors();
 
     init();
