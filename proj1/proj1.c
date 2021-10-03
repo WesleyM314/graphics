@@ -33,7 +33,8 @@ mat4 ctm = {
     {0, 0, 0, 1},
 };
 
-GLfloat idleRads = 0; // Radians for idle animation rotation
+// GLfloat idleRads = 0; // Radians for idle animation rotation
+mat4 idleRotate;    // Rotation matrix for idle animation
 
 /**
  * Idle animation
@@ -42,14 +43,16 @@ void idle(void)
 {
     if (!pause)
     {
-        idleRads += 0.005;
-        if (idleRads > 2 * M_PI)
-        {
-            idleRads = 0;
-        }
+        // idleRads += 0.005;
+        // if (idleRads > 2 * M_PI)
+        // {
+        //     idleRads = 0;
+        // }
 
-        // Get ctm
-        ctm = x_rotate(idleRads);
+        // // Get ctm
+        // ctm = x_rotate(idleRads);
+        // mat4 r = x_rotate(0.005);
+        ctm = multMat(&idleRotate, &ctm);
         // Redraw
         glutPostRedisplay();
     }
@@ -270,6 +273,26 @@ void display(void)
     glutSwapBuffers();
 }
 
+void mouse(int button, int state, int x, int y)
+{
+    if(button == 3)
+    {
+        // printf("Scroll up\n");
+        // Zoom in
+        mat4 s = scale(1.1, 1.1, 1.1);
+        ctm = multMat(&s, &ctm);
+        glutPostRedisplay();
+    }
+    if(button == 4)
+    {
+        // printf("Scroll down\n");
+        // Zoom out
+        mat4 s = scale(0.9, 0.9, 0.9);
+        ctm = multMat(&s, &ctm);
+        glutPostRedisplay();
+    }
+}
+
 void keyboard(unsigned char key, int mousex, int mousey)
 {
     if (key == 'q')
@@ -320,10 +343,12 @@ int main(int argc, char **argv)
     }
 
     randColors();
+    idleRotate = x_rotate(0.005);
 
     init();
     glutDisplayFunc(display);
     glutKeyboardFunc(keyboard);
+    glutMouseFunc(mouse);
     // glutReshapeFunc(reshape);
 
     glutIdleFunc(idle);
