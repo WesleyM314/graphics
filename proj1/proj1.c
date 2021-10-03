@@ -16,6 +16,7 @@
 #include "../lib/lib.h"
 
 #define BUFFER_OFFSET(offset) ((GLvoid *)(offset))
+#define WSIZE 1024
 
 GLuint ctm_location;
 
@@ -34,7 +35,7 @@ mat4 ctm = {
 };
 
 // GLfloat idleRads = 0; // Radians for idle animation rotation
-mat4 idleRotate;    // Rotation matrix for idle animation
+mat4 idleRotate; // Rotation matrix for idle animation
 
 /**
  * Idle animation
@@ -168,18 +169,12 @@ void fromFile(void)
 {
     FILE *f;
     int num = 0;
-    GLfloat sFactor = 0.007; // Scale factor
     f = fopen("falcon.txt", "r");
     fscanf(f, "%d", &num);
     printf("%d\n", num);
 
     // Allocate memory for vertices
     vertices = (vec4 *)malloc(sizeof(vec4) * num);
-
-    // Create scaling matrix
-    mat4 s = scale(sFactor, sFactor, sFactor);
-    mat4 t = translate(0, 0, -0.4);
-    mat4 tr = multMat(&t, &s);
 
     GLfloat x, y, z, w;
     vec4 v;
@@ -189,10 +184,56 @@ void fromFile(void)
         fscanf(f, "%f, %f, %f, %f", &x, &y, &z, &w);
         v = v4(x, y, z, w);
         // Transform
-        v = multMatVec(&tr, &v);
+        // v = multMatVec(&tr, &v);
 
         // Add vertice
         vertices[num_vertices++] = v;
+    }
+
+    // Find bounds of points
+    GLfloat minx = 0, maxx = 0, miny = 0, maxy = 0, minz = 0, maxz = 0;
+    for (int i = 0; i < num_vertices; i++)
+    {
+        minx = vertices[i].x < minx ? vertices[i].x : minx;
+        maxx = vertices[i].x > maxx ? vertices[i].x : maxx;
+
+        miny = vertices[i].y < miny ? vertices[i].y : miny;
+        maxy = vertices[i].y > maxy ? vertices[i].y : maxy;
+
+        minz = vertices[i].z < minz ? vertices[i].z : minz;
+        maxz = vertices[i].z > maxz ? vertices[i].z : maxz;
+    }
+
+    // Center point
+    vec4 center = v4((maxx + minx) / 2, (maxy + miny) / 2, (maxz + minz) / 2, 1);
+
+    // Find largest range, use that to scale
+    GLfloat scaleFactor;
+    if (maxx - minx > maxy - miny && maxx - minx > maxz - minz)
+    {
+        // X largest range
+        scaleFactor = 1 / (maxx - minx);
+    }
+    else if (maxy - miny > maxx - minx && maxy - miny > maxz - minz)
+    {
+        // Y largest range
+        scaleFactor = 1 / (maxy - miny);
+    }
+    else
+    {
+        // Z largest range or no range larger than other two
+        scaleFactor = 1 / (maxz - minz);
+    }
+
+    // Translate so midpoint == origin, then scale
+    mat4 t = translate(-center.x, -center.y, -center.z);
+    mat4 s = scale(scaleFactor, scaleFactor, scaleFactor);
+    mat4 tr = multMat(&s, &t);
+
+    // Translate and scale all vertices
+    for (int i = 0; i < num_vertices; i++)
+    {
+        vertices[i] = multMatVec(&tr, &vertices[i]);
     }
 }
 
@@ -275,7 +316,7 @@ void display(void)
 
 void mouse(int button, int state, int x, int y)
 {
-    if(button == 3)
+    if (button == 3)
     {
         // printf("Scroll up\n");
         // Zoom in
@@ -283,7 +324,7 @@ void mouse(int button, int state, int x, int y)
         ctm = multMat(&s, &ctm);
         glutPostRedisplay();
     }
-    if(button == 4)
+    if (button == 4)
     {
         // printf("Scroll down\n");
         // Zoom out
@@ -291,6 +332,11 @@ void mouse(int button, int state, int x, int y)
         ctm = multMat(&s, &ctm);
         glutPostRedisplay();
     }
+}
+
+void motion(int x, int y)
+{
+    // printf("x: %d\ty:%d\r", x, y);
 }
 
 void keyboard(unsigned char key, int mousex, int mousey)
@@ -318,7 +364,7 @@ int main(int argc, char **argv)
 
     glutInit(&argc, argv);
     glutInitDisplayMode(GLUT_RGBA | GLUT_DOUBLE | GLUT_DEPTH);
-    glutInitWindowSize(1024, 1024);
+    glutInitWindowSize(WSIZE, WSIZE);
     glutInitWindowPosition(100, 100);
     glutCreateWindow("Template");
     glewInit();
@@ -349,6 +395,7 @@ int main(int argc, char **argv)
     glutDisplayFunc(display);
     glutKeyboardFunc(keyboard);
     glutMouseFunc(mouse);
+    glutMotionFunc(motion);
     // glutReshapeFunc(reshape);
 
     glutIdleFunc(idle);
