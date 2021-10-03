@@ -34,8 +34,29 @@ mat4 ctm = {
     {0, 0, 0, 1},
 };
 
+// Variables for mouse movements/dragging
+vec4 curPoint = (vec4){0, 0, 0, 1};
+vec4 prevPoint = (vec4){0, 0, 0, 1};
+vec4 rotateAxis = (vec4){0, 0, 0, 1};
+mat4 rx = {
+    {1, 0, 0, 0},
+    {0, 1, 0, 0},
+    {0, 0, 1, 0},
+    {0, 0, 0, 1},
+};
+mat4 ry = {
+    {1, 0, 0, 0},
+    {0, 1, 0, 0},
+    {0, 0, 1, 0},
+    {0, 0, 0, 1},
+};
+mat4 rz;
+mat4 rotateMat;
+
 // GLfloat idleRads = 0; // Radians for idle animation rotation
 mat4 idleRotate; // Rotation matrix for idle animation
+
+void setCurPoint(int x, int y);
 
 /**
  * Idle animation
@@ -316,6 +337,15 @@ void display(void)
 
 void mouse(int button, int state, int x, int y)
 {
+    if (button == GLUT_LEFT_BUTTON)
+    {
+        if (state == GLUT_DOWN)
+        {
+            // On left button click, set curPoint
+            // prevPoint doesn't matter
+            setCurPoint(x, y);
+        }
+    }
     if (button == 3)
     {
         // printf("Scroll up\n");
@@ -334,9 +364,79 @@ void mouse(int button, int state, int x, int y)
     }
 }
 
+void setCurPoint(int x, int y)
+{
+    // Calculate current point vector
+    // Convert x and y to OpenGL coordinates
+    GLfloat gl_x, gl_y, gl_z;
+    gl_x = ((GLfloat)x - ((GLfloat)WSIZE / 2.0)) / ((GLfloat)WSIZE / 2.0);
+    gl_y = -((GLfloat)y - ((GLfloat)WSIZE / 2.0)) / ((GLfloat)WSIZE / 2.0);
+
+    // Calculate z coordinate assuming our "glass ball" is a unit sphere
+    // TODO check for out of range coordinates
+    gl_z = sqrtf(1.0 - gl_x * gl_x - gl_y * gl_y);
+
+    // Set curPoint
+    curPoint = v4(gl_x, gl_y, gl_z, 1.0);
+}
+
 void motion(int x, int y)
 {
     // printf("x: %d\ty:%d\r", x, y);
+
+    // Move curPoint to prevPoint
+    prevPoint = curPoint;
+
+    // Set curPoint
+    setCurPoint(x, y);
+
+    // Calculate angle between prevPoint and curPoint
+    GLfloat theta = acosf(dotVec(&prevPoint, &curPoint) / (magnitude(&prevPoint) * magnitude(&curPoint)));
+    theta = 0.01;
+    // Object will be rotated about z by theta degrees
+    rz = z_rotate(theta);
+
+    // // Calculate current point vector
+    // // Convert x and y to OpenGL coordinates
+    // GLfloat gl_x, gl_y, gl_z;
+    // gl_x = ((GLfloat)x - ((GLfloat)WSIZE / 2.0)) / ((GLfloat)WSIZE / 2.0);
+    // gl_y = -((GLfloat)y - ((GLfloat)WSIZE / 2.0)) / ((GLfloat)WSIZE / 2.0);
+
+    // // Calculate z coordinate assuming our "glass ball" is a unit sphere
+    // // TODO check for out of range coordinates
+    // gl_z = sqrtf(1.0 - gl_x * gl_x - gl_y * gl_y);
+
+    // // Set curPoint
+    // curPoint = v4(gl_x, gl_y, gl_z, 1.0);
+
+    // Calculate rotational axis using cross product
+    // of curPoint and prevPoint
+    rotateAxis = crossVec(&prevPoint, &curPoint);
+    // Normalize rotateAxis
+    rotateAxis = normalize(&rotateAxis);
+
+    // Use origin as fixed point
+    // Rotate axis to plane y = 0
+    GLfloat d = sqrtf(rotateAxis.y * rotateAxis.y + rotateAxis.z * rotateAxis.z);
+    rx.y = (vec4){0, rotateAxis.z / d, rotateAxis.y / d, 0};
+    rx.z = (vec4){0, -rotateAxis.y / d, rotateAxis.z / d, 0};
+
+    // Rotate axis to plane x = 0
+    ry.x = (vec4){d, 0, rotateAxis.x, 0};
+    ry.z = (vec4){-rotateAxis.x, 0, d, 0};
+
+    // Get final transformation matrix
+    rotateMat = multMat(&ry, &rx);
+    rotateMat = multMat(&rz, &rotateMat);
+    // Transpose rx and ry
+    rx = transpose(&rx);
+    ry = transpose(&ry);
+    rotateMat = multMat(&ry, &rotateMat);
+    rotateMat = multMat(&rx, &rotateMat);
+
+    // Update ctm
+    ctm = multMat(&rotateMat, &ctm);
+    glutPostRedisplay();
 }
 
 void keyboard(unsigned char key, int mousex, int mousey)
