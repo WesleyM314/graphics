@@ -74,9 +74,9 @@ void idle(void)
         // // Get ctm
         // ctm = x_rotate(idleRads);
         // mat4 r = x_rotate(0.005);
-        ctm = multMat(&idleRotate, &ctm);
+        // ctm = multMat(&idleRotate, &ctm);
         // Redraw
-        glutPostRedisplay();
+        // glutPostRedisplay();
     }
 }
 
@@ -368,13 +368,25 @@ void setCurPoint(int x, int y)
 {
     // Calculate current point vector
     // Convert x and y to OpenGL coordinates
-    GLfloat gl_x, gl_y, gl_z;
+    GLfloat gl_x, gl_y, gl_z, temp;
     gl_x = ((GLfloat)x - ((GLfloat)WSIZE / 2.0)) / ((GLfloat)WSIZE / 2.0);
     gl_y = -((GLfloat)y - ((GLfloat)WSIZE / 2.0)) / ((GLfloat)WSIZE / 2.0);
 
     // Calculate z coordinate assuming our "glass ball" is a unit sphere
     // TODO check for out of range coordinates
-    gl_z = sqrtf(1.0 - gl_x * gl_x - gl_y * gl_y);
+    temp = 1.0 - (gl_x * gl_x + gl_y * gl_y);
+    printf("gl_z^2: %f\n", temp);
+
+    if (temp < 0)
+    {
+        printf("OUT OF BOUNDS\n");
+        gl_z = 0;
+    }
+    else
+    {
+        gl_z = sqrt(temp);
+    }
+    printf("gl_x: %f\tgl_y: %f\tgl_z: %f\n", gl_x, gl_y, gl_z);
 
     // Set curPoint
     curPoint = v4(gl_x, gl_y, gl_z, 1.0);
@@ -382,32 +394,23 @@ void setCurPoint(int x, int y)
 
 void motion(int x, int y)
 {
-    // printf("x: %d\ty:%d\r", x, y);
-
     // Move curPoint to prevPoint
     prevPoint = curPoint;
 
     // Set curPoint
     setCurPoint(x, y);
 
+    // return if curPoint and prevPoint are the same
+    // to avoid NaN errors
+    if (equalVecs(&curPoint, &prevPoint))
+    {
+        return;
+    }
+
     // Calculate angle between prevPoint and curPoint
     GLfloat theta = acosf(dotVec(&prevPoint, &curPoint) / (magnitude(&prevPoint) * magnitude(&curPoint)));
-    theta = 0.01;
     // Object will be rotated about z by theta degrees
     rz = z_rotate(theta);
-
-    // // Calculate current point vector
-    // // Convert x and y to OpenGL coordinates
-    // GLfloat gl_x, gl_y, gl_z;
-    // gl_x = ((GLfloat)x - ((GLfloat)WSIZE / 2.0)) / ((GLfloat)WSIZE / 2.0);
-    // gl_y = -((GLfloat)y - ((GLfloat)WSIZE / 2.0)) / ((GLfloat)WSIZE / 2.0);
-
-    // // Calculate z coordinate assuming our "glass ball" is a unit sphere
-    // // TODO check for out of range coordinates
-    // gl_z = sqrtf(1.0 - gl_x * gl_x - gl_y * gl_y);
-
-    // // Set curPoint
-    // curPoint = v4(gl_x, gl_y, gl_z, 1.0);
 
     // Calculate rotational axis using cross product
     // of curPoint and prevPoint
@@ -434,6 +437,9 @@ void motion(int x, int y)
     rotateMat = multMat(&ry, &rotateMat);
     rotateMat = multMat(&rx, &rotateMat);
 
+    printf("rotateMat\n");
+    printMat(&rotateMat);
+
     // Update ctm
     ctm = multMat(&rotateMat, &ctm);
     glutPostRedisplay();
@@ -445,8 +451,11 @@ void keyboard(unsigned char key, int mousex, int mousey)
         glutLeaveMainLoop();
     if (key == ' ')
         pause = !pause;
-
-    //glutPostRedisplay();
+    if (key == 'r')
+    {
+        ctm = identity();
+        glutPostRedisplay();
+    }
 }
 
 void reshape(int width, int height)

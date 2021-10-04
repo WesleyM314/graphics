@@ -45,6 +45,11 @@ void arrToVec(vec4Arr arr, vec4 *v)
 	v->w = arr[3];
 }
 
+char equalVecs(vec4 *m, vec4 *n)
+{
+	return (m->x == n->x && m->y == n->y && m->z == n->z && m->w == n->w) ? 1 : 0;
+}
+
 /**
  * Multiplies a vector by a scalar value, returning
  * a new 4x1 vector
@@ -172,6 +177,20 @@ mat4 arrToMat(mat4Arr arr)
 		{arr[12], arr[13], arr[14], arr[15]},
 	};
 
+	return temp;
+}
+
+/**
+ * Returns the identity matrix.
+ */
+mat4 identity(void)
+{
+	mat4 temp = {
+		{1, 0, 0, 0},
+		{0, 1, 0, 0},
+		{0, 0, 1, 0},
+		{0, 0, 0, 1},
+	};
 	return temp;
 }
 
