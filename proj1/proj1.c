@@ -81,6 +81,78 @@ void idle(void)
 }
 
 /**
+ * Create unit sphere
+ */
+void unitSphere(void)
+{
+    GLfloat theta;
+    mat4 r;
+    GLint numSegments = 10, numRings = 10;
+
+    // Allocate space for vertices
+    int numVerts = ((numRings)*6) * numSegments;
+    vertices = (vec4 *)malloc(sizeof(vec4) * numVerts);
+
+    // Form reference edges of segment
+    vec4 *ref1 = (vec4 *)malloc(sizeof(vec4) * (numRings + 1));
+    vec4 *ref2 = (vec4 *)malloc(sizeof(vec4) * (numRings + 1));
+    theta = M_PI / numRings;
+    r = z_rotate(-theta);
+    ref1[0] = v4(0, 1, 0, 1);
+    for (int i = 1; i <= numRings; i++)
+    {
+        ref1[i] = multMatVec(&r, &ref1[i - 1]);
+    }
+
+    // Copy ref1 to ref2 and rotate about y axis
+    theta = 2 * M_PI / numSegments;
+    r = y_rotate(theta);
+    for (int i = 0; i <= numRings; i++)
+    {
+        ref2[i] = multMatVec(&r, &ref1[i]);
+    }
+
+    // Rotate ref segment about y axis, adding triangles
+    for (int i = 0; i < numSegments; i++)
+    {
+        for (int j = 0; j <= numRings; j++)
+        {
+            // Top sphere cap - single triangle
+            if (j == 0)
+            {
+                vertices[num_vertices++] = ref1[0];
+                vertices[num_vertices++] = ref1[1];
+                vertices[num_vertices++] = ref2[1];
+            }
+            // Bottom sphere cap
+            else if (j == numRings)
+            {
+                vertices[num_vertices++] = ref1[j - 1];
+                vertices[num_vertices++] = ref1[j];
+                vertices[num_vertices++] = ref2[j - 1];
+            }
+            else
+            {
+                vertices[num_vertices++] = ref1[j];
+                vertices[num_vertices++] = ref1[j + 1];
+                vertices[num_vertices++] = ref2[j];
+
+                vertices[num_vertices++] = ref1[j + 1];
+                vertices[num_vertices++] = ref2[j + 1];
+                vertices[num_vertices++] = ref2[j];
+            }
+        }
+
+        // Rotate ref1 and ref2 about y axis
+        for (int j = 0; j <= numRings; j++)
+        {
+            ref1[j] = multMatVec(&r, &ref1[j]);
+            ref2[j] = multMatVec(&r, &ref1[j]);
+        }
+    }
+}
+
+/**
  * Creates my computer generated object (sphere, torus, or spring)
  */
 void spring(void)
@@ -413,7 +485,7 @@ void motion(int x, int y)
     }
 
     // Calculate angle between prevPoint and curPoint
-    GLfloat theta = 2 * acosf(dotVec(&prevPoint, &curPoint) / (magnitude(&prevPoint) * magnitude(&curPoint)));
+    GLfloat theta = acosf(dotVec(&prevPoint, &curPoint) / (magnitude(&prevPoint) * magnitude(&curPoint)));
     printf("theta: %f\n", theta);
     // Object will be rotated about z by theta degrees
     rz = z_rotate(theta);
@@ -509,6 +581,11 @@ int main(int argc, char **argv)
         {
             printf("Loading from file...\n");
             fromFile();
+        }
+        else if (!strcmp(argv[1], "sphere"))
+        {
+            printf("Drawing unit sphere...\n");
+            unitSphere();
         }
         else
         {
