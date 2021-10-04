@@ -375,7 +375,7 @@ void setCurPoint(int x, int y)
     // Calculate z coordinate assuming our "glass ball" is a unit sphere
     // TODO check for out of range coordinates
     temp = 1.0 - (gl_x * gl_x + gl_y * gl_y);
-    printf("gl_z^2: %f\n", temp);
+    // printf("gl_z^2: %f\n", temp);
 
     if (temp < 0)
     {
@@ -386,7 +386,7 @@ void setCurPoint(int x, int y)
     {
         gl_z = sqrt(temp);
     }
-    printf("gl_x: %f\tgl_y: %f\tgl_z: %f\n", gl_x, gl_y, gl_z);
+    // printf("gl_x: %f\tgl_y: %f\tgl_z: %f\n", gl_x, gl_y, gl_z);
 
     // Set curPoint
     curPoint = v4(gl_x, gl_y, gl_z, 1.0);
@@ -400,6 +400,11 @@ void motion(int x, int y)
     // Set curPoint
     setCurPoint(x, y);
 
+    printf("\nprevPoint\n");
+    printVec(&prevPoint);
+    printf("curPoint\n");
+    printVec(&curPoint);
+
     // return if curPoint and prevPoint are the same
     // to avoid NaN errors
     if (equalVecs(&curPoint, &prevPoint))
@@ -408,21 +413,36 @@ void motion(int x, int y)
     }
 
     // Calculate angle between prevPoint and curPoint
-    GLfloat theta = acosf(dotVec(&prevPoint, &curPoint) / (magnitude(&prevPoint) * magnitude(&curPoint)));
+    GLfloat theta = 2 * acosf(dotVec(&prevPoint, &curPoint) / (magnitude(&prevPoint) * magnitude(&curPoint)));
+    printf("theta: %f\n", theta);
     // Object will be rotated about z by theta degrees
     rz = z_rotate(theta);
 
     // Calculate rotational axis using cross product
     // of curPoint and prevPoint
     rotateAxis = crossVec(&prevPoint, &curPoint);
+    printf("rotateAxis\n");
+    printVec(&rotateAxis);
+    // If rotation axis is zero vector (like when moving on a
+    // diagonal off the edges of the "glass ball") just return
+    if (!rotateAxis.x && !rotateAxis.y && !rotateAxis.z)
+    {
+        return;
+    }
     // Normalize rotateAxis
     rotateAxis = normalize(&rotateAxis);
+    printf("rotateAxis normalized\n");
+    printVec(&rotateAxis);
 
     // Use origin as fixed point
     // Rotate axis to plane y = 0
     GLfloat d = sqrtf(rotateAxis.y * rotateAxis.y + rotateAxis.z * rotateAxis.z);
-    rx.y = (vec4){0, rotateAxis.z / d, rotateAxis.y / d, 0};
-    rx.z = (vec4){0, -rotateAxis.y / d, rotateAxis.z / d, 0};
+
+    if (d != 0)
+    {
+        rx.y = (vec4){0, rotateAxis.z / d, rotateAxis.y / d, 0};
+        rx.z = (vec4){0, -rotateAxis.y / d, rotateAxis.z / d, 0};
+    }
 
     // Rotate axis to plane x = 0
     ry.x = (vec4){d, 0, rotateAxis.x, 0};
