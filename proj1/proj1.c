@@ -14,6 +14,7 @@
 
 #include "../lib/initShader.h"
 #include "../lib/lib.h"
+#include "proj1.h"
 
 #define BUFFER_OFFSET(offset) ((GLvoid *)(offset))
 #define WSIZE 1024
@@ -26,6 +27,7 @@ vec4 *colors;
 int num_vertices = 0;
 int num_colors = 0;
 GLboolean pause = 0;
+GLboolean idleSpin = GL_FALSE;
 
 mat4 ctm = {
     {1, 0, 0, 0},
@@ -50,33 +52,28 @@ mat4 ry = {
     {0, 0, 1, 0},
     {0, 0, 0, 1},
 };
-mat4 rz;
-mat4 rotateMat;
-
-// GLfloat idleRads = 0; // Radians for idle animation rotation
-mat4 idleRotate; // Rotation matrix for idle animation
-
-void setCurPoint(int x, int y);
+mat4 rz = {
+    {1, 0, 0, 0},
+    {0, 1, 0, 0},
+    {0, 0, 1, 0},
+    {0, 0, 0, 1},
+};
+mat4 rotateMat = {
+    {1, 0, 0, 0},
+    {0, 1, 0, 0},
+    {0, 0, 1, 0},
+    {0, 0, 0, 1},
+};
 
 /**
  * Idle animation
  */
 void idle(void)
 {
-    if (!pause)
+    if (idleSpin)
     {
-        // idleRads += 0.005;
-        // if (idleRads > 2 * M_PI)
-        // {
-        //     idleRads = 0;
-        // }
-
-        // // Get ctm
-        // ctm = x_rotate(idleRads);
-        // mat4 r = x_rotate(0.005);
-        // ctm = multMat(&idleRotate, &ctm);
-        // Redraw
-        // glutPostRedisplay();
+        ctm = multMat(&rotateMat, &ctm);
+        glutPostRedisplay();
     }
 }
 
@@ -160,7 +157,6 @@ void spring(void)
 
     GLfloat theta, x, y;
     mat4 r, t, tr;
-    // TORUS
     // Number of loop segments that make
     // up the torus
     GLint numSegments = 36;
@@ -257,7 +253,10 @@ void spring(void)
         vertices[i] = multMatVec(&tr, &vertices[i]);
     }
 }
-
+/**
+ * Reads vertices from a txt file
+ * and displays the object
+ */
 void fromFile(void)
 {
     FILE *f;
@@ -302,21 +301,19 @@ void fromFile(void)
 
     // Find largest range, use that to scale
     GLfloat scaleFactor;
-    if (maxx - minx > maxy - miny && maxx - minx > maxz - minz)
-    {
-        // X largest range
-        scaleFactor = 1 / (maxx - minx);
-    }
-    else if (maxy - miny > maxx - minx && maxy - miny > maxz - minz)
-    {
-        // Y largest range
-        scaleFactor = 1 / (maxy - miny);
-    }
-    else
-    {
-        // Z largest range or no range larger than other two
-        scaleFactor = 1 / (maxz - minz);
-    }
+
+    GLfloat xrange, yrange, zrange;
+    xrange = abs(maxx - minx);
+    yrange = abs(maxy - miny);
+    zrange = abs(maxz - minz);
+
+    scaleFactor = xrange;
+    if (yrange > scaleFactor)
+        scaleFactor = yrange;
+    if (zrange > scaleFactor)
+        scaleFactor = zrange;
+
+    scaleFactor = 2 / scaleFactor;
 
     // Translate so midpoint == origin, then scale
     mat4 t = translate(-center.x, -center.y, -center.z);
@@ -416,21 +413,26 @@ void mouse(int button, int state, int x, int y)
             // On left button click, set curPoint
             // prevPoint doesn't matter
             setCurPoint(x, y);
+            // Stop rotation
+            rotateMat = identity();
+            idleSpin = GL_FALSE;
+        }
+        else if (state == GLUT_UP)
+        {
+            idleSpin = GL_TRUE;
         }
     }
     if (button == 3)
     {
-        // printf("Scroll up\n");
         // Zoom in
-        mat4 s = scale(1.1, 1.1, 1.1);
+        mat4 s = scale(1.02, 1.02, 1.02);
         ctm = multMat(&s, &ctm);
         glutPostRedisplay();
     }
     if (button == 4)
     {
-        // printf("Scroll down\n");
         // Zoom out
-        mat4 s = scale(0.9, 0.9, 0.9);
+        mat4 s = scale(1 / 1.02, 1 / 1.02, 1 / 1.02);
         ctm = multMat(&s, &ctm);
         glutPostRedisplay();
     }
@@ -445,13 +447,16 @@ void setCurPoint(int x, int y)
     gl_y = -((GLfloat)y - ((GLfloat)WSIZE / 2.0)) / ((GLfloat)WSIZE / 2.0);
 
     // Calculate z coordinate assuming our "glass ball" is a unit sphere
-    // TODO check for out of range coordinates
     temp = 1.0 - (gl_x * gl_x + gl_y * gl_y);
     // printf("gl_z^2: %f\n", temp);
 
     if (temp < 0)
     {
-        printf("OUT OF BOUNDS\n");
+        // printf("OUT OF BOUNDS\n");
+        // If temp is < 0, the mouse is off the
+        // "glass ball" and z needs to be set
+        // to 0 manually (at least that's how I'm
+        // choosing to handle it).
         gl_z = 0;
     }
     else
@@ -472,10 +477,10 @@ void motion(int x, int y)
     // Set curPoint
     setCurPoint(x, y);
 
-    printf("\nprevPoint\n");
-    printVec(&prevPoint);
-    printf("curPoint\n");
-    printVec(&curPoint);
+    // printf("\nprevPoint\n");
+    // printVec(&prevPoint);
+    // printf("curPoint\n");
+    // printVec(&curPoint);
 
     // return if curPoint and prevPoint are the same
     // to avoid NaN errors
@@ -485,26 +490,31 @@ void motion(int x, int y)
     }
 
     // Calculate angle between prevPoint and curPoint
-    GLfloat theta = acosf(dotVec(&prevPoint, &curPoint) / (magnitude(&prevPoint) * magnitude(&curPoint)));
-    printf("theta: %f\n", theta);
+    // Not sure why, but it seems I need to multiply by
+    // 1.5 to have the unit sphere move more closely
+    // with the mouse cursor
+    GLfloat theta = 1.5 * acosf(dotVec(&prevPoint, &curPoint) / (magnitude(&prevPoint) * magnitude(&curPoint)));
+    // printf("theta: %f\n", theta);
     // Object will be rotated about z by theta degrees
     rz = z_rotate(theta);
 
     // Calculate rotational axis using cross product
     // of curPoint and prevPoint
     rotateAxis = crossVec(&prevPoint, &curPoint);
-    printf("rotateAxis\n");
-    printVec(&rotateAxis);
+    // printf("rotateAxis\n");
+    // printVec(&rotateAxis);
+
     // If rotation axis is zero vector (like when moving on a
     // diagonal off the edges of the "glass ball") just return
     if (!rotateAxis.x && !rotateAxis.y && !rotateAxis.z)
     {
         return;
     }
+
     // Normalize rotateAxis
     rotateAxis = normalize(&rotateAxis);
-    printf("rotateAxis normalized\n");
-    printVec(&rotateAxis);
+    // printf("rotateAxis normalized\n");
+    // printVec(&rotateAxis);
 
     // Use origin as fixed point
     // Rotate axis to plane y = 0
@@ -529,8 +539,8 @@ void motion(int x, int y)
     rotateMat = multMat(&ry, &rotateMat);
     rotateMat = multMat(&rx, &rotateMat);
 
-    printf("rotateMat\n");
-    printMat(&rotateMat);
+    // printf("rotateMat\n");
+    // printMat(&rotateMat);
 
     // Update ctm
     ctm = multMat(&rotateMat, &ctm);
@@ -541,11 +551,10 @@ void keyboard(unsigned char key, int mousex, int mousey)
 {
     if (key == 'q')
         glutLeaveMainLoop();
-    if (key == ' ')
-        pause = !pause;
     if (key == 'r')
     {
         ctm = identity();
+        rotateMat = identity();
         glutPostRedisplay();
     }
 }
@@ -595,7 +604,6 @@ int main(int argc, char **argv)
     }
 
     randColors();
-    idleRotate = x_rotate(0.005);
 
     init();
     glutDisplayFunc(display);
