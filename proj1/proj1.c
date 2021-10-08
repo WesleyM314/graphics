@@ -84,7 +84,7 @@ void unitSphere(void)
 {
     GLfloat theta;
     mat4 r;
-    GLint numSegments = 10, numRings = 10;
+    GLint numSegments = 40, numRings = 40;
 
     // Allocate space for vertices
     int numVerts = ((numRings)*6) * numSegments;
@@ -257,11 +257,16 @@ void spring(void)
  * Reads vertices from a txt file
  * and displays the object
  */
-void fromFile(void)
+void fromFile(char * filename)
 {
     FILE *f;
     int num = 0;
-    f = fopen("falcon.txt", "r");
+    f = fopen(filename, "r");
+    if(f == NULL)
+    {
+        printf("ERROR: File '%s' could not be opened\n", filename);
+        exit(0);
+    }
     fscanf(f, "%d", &num);
     printf("%d\n", num);
 
@@ -566,11 +571,11 @@ void reshape(int width, int height)
 
 int main(int argc, char **argv)
 {
-    if (argc != 2)
-    {
-        printf("Expected an argument: 'spring' or 'file'\n");
-        exit(0);
-    }
+    // if (argc  2)
+    // {
+    //     printf("Expected an argument: 'spring' or 'file'\n");
+    //     exit(0);
+    // }
 
     glutInit(&argc, argv);
     glutInitDisplayMode(GLUT_RGBA | GLUT_DOUBLE | GLUT_DEPTH);
@@ -579,7 +584,7 @@ int main(int argc, char **argv)
     glutCreateWindow("Template");
     glewInit();
 
-    if (argc == 2)
+    if (argc >= 2)
     {
         if (!strcmp(argv[1], "spring"))
         {
@@ -588,19 +593,30 @@ int main(int argc, char **argv)
         }
         else if (!strcmp(argv[1], "file"))
         {
+            if (argc < 3)
+            {
+                printf("Missing argument\n");
+                printf("Expected arguments: [spring] or [file <filename>]\n");
+                exit(0);
+            }
             printf("Loading from file...\n");
-            fromFile();
+            fromFile(argv[2]);
         }
         else if (!strcmp(argv[1], "sphere"))
         {
             printf("Drawing unit sphere...\n");
             unitSphere();
         }
-        else
-        {
-            printf("Expected an argument: 'spring' or 'file'\n");
-            exit(0);
-        }
+        // else
+        // {
+        //     printf("Expected an argument: 'spring' or 'file <filename>'\n");
+        //     exit(0);
+        // }
+    }
+    else
+    {
+        printf("Expected arguments: [spring] or [file <filename>]\n");
+        exit(0);
     }
 
     randColors();
