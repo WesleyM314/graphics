@@ -257,12 +257,12 @@ void spring(void)
  * Reads vertices from a txt file
  * and displays the object
  */
-void fromFile(char * filename)
+void fromFile(char *filename)
 {
     FILE *f;
     int num = 0;
     f = fopen(filename, "r");
-    if(f == NULL)
+    if (f == NULL)
     {
         printf("ERROR: File '%s' could not be opened\n", filename);
         exit(0);
@@ -280,8 +280,6 @@ void fromFile(char * filename)
         // Read line
         fscanf(f, "%f, %f, %f, %f", &x, &y, &z, &w);
         v = v4(x, y, z, w);
-        // Transform
-        // v = multMatVec(&tr, &v);
 
         // Add vertice
         vertices[num_vertices++] = v;
@@ -453,11 +451,9 @@ void setCurPoint(int x, int y)
 
     // Calculate z coordinate assuming our "glass ball" is a unit sphere
     temp = 1.0 - (gl_x * gl_x + gl_y * gl_y);
-    // printf("gl_z^2: %f\n", temp);
 
     if (temp < 0)
     {
-        // printf("OUT OF BOUNDS\n");
         // If temp is < 0, the mouse is off the
         // "glass ball" and z needs to be set
         // to 0 manually (at least that's how I'm
@@ -468,7 +464,6 @@ void setCurPoint(int x, int y)
     {
         gl_z = sqrt(temp);
     }
-    // printf("gl_x: %f\tgl_y: %f\tgl_z: %f\n", gl_x, gl_y, gl_z);
 
     // Set curPoint
     curPoint = v4(gl_x, gl_y, gl_z, 1.0);
@@ -482,11 +477,6 @@ void motion(int x, int y)
     // Set curPoint
     setCurPoint(x, y);
 
-    // printf("\nprevPoint\n");
-    // printVec(&prevPoint);
-    // printf("curPoint\n");
-    // printVec(&curPoint);
-
     // return if curPoint and prevPoint are the same
     // to avoid NaN errors
     if (equalVecs(&curPoint, &prevPoint))
@@ -499,15 +489,13 @@ void motion(int x, int y)
     // 1.5 to have the unit sphere move more closely
     // with the mouse cursor
     GLfloat theta = 1.5 * acosf(dotVec(&prevPoint, &curPoint) / (magnitude(&prevPoint) * magnitude(&curPoint)));
-    // printf("theta: %f\n", theta);
+
     // Object will be rotated about z by theta degrees
     rz = z_rotate(theta);
 
     // Calculate rotational axis using cross product
     // of curPoint and prevPoint
     rotateAxis = crossVec(&prevPoint, &curPoint);
-    // printf("rotateAxis\n");
-    // printVec(&rotateAxis);
 
     // If rotation axis is zero vector (like when moving on a
     // diagonal off the edges of the "glass ball") just return
@@ -518,8 +506,6 @@ void motion(int x, int y)
 
     // Normalize rotateAxis
     rotateAxis = normalize(&rotateAxis);
-    // printf("rotateAxis normalized\n");
-    // printVec(&rotateAxis);
 
     // Use origin as fixed point
     // Rotate axis to plane y = 0
@@ -544,9 +530,6 @@ void motion(int x, int y)
     rotateMat = multMat(&ry, &rotateMat);
     rotateMat = multMat(&rx, &rotateMat);
 
-    // printf("rotateMat\n");
-    // printMat(&rotateMat);
-
     // Update ctm
     ctm = multMat(&rotateMat, &ctm);
     glutPostRedisplay();
@@ -566,17 +549,11 @@ void keyboard(unsigned char key, int mousex, int mousey)
 
 void reshape(int width, int height)
 {
-    glViewport(0, 0, 512, 512);
+    glViewport(0, 0, WSIZE, WSIZE);
 }
 
 int main(int argc, char **argv)
 {
-    // if (argc  2)
-    // {
-    //     printf("Expected an argument: 'spring' or 'file'\n");
-    //     exit(0);
-    // }
-
     glutInit(&argc, argv);
     glutInitDisplayMode(GLUT_RGBA | GLUT_DOUBLE | GLUT_DEPTH);
     glutInitWindowSize(WSIZE, WSIZE);
@@ -588,11 +565,13 @@ int main(int argc, char **argv)
     {
         if (!strcmp(argv[1], "spring"))
         {
+            // Display spring
             printf("Drawing spring...\n");
             spring();
         }
         else if (!strcmp(argv[1], "file"))
         {
+            // Load from file
             if (argc < 3)
             {
                 printf("Missing argument\n");
@@ -604,14 +583,10 @@ int main(int argc, char **argv)
         }
         else if (!strcmp(argv[1], "sphere"))
         {
+            // Display unit sphere for testing
             printf("Drawing unit sphere...\n");
             unitSphere();
         }
-        // else
-        // {
-        //     printf("Expected an argument: 'spring' or 'file <filename>'\n");
-        //     exit(0);
-        // }
     }
     else
     {

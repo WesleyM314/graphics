@@ -59,4 +59,7 @@ dkms.conf
 
 # Ignore zip files
 *.zip
+# Ignore txt files EXCEPT readme.txt
+*.txt
+!README.txt
 
