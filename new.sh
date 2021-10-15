@@ -7,4 +7,4 @@ cp -r template/ $1
 find ./$1 -type f -exec sed -i "s/template/$1/g" {} \;
 
 # Rename template.c to arg1.c
-cd $1 && mv template.c $1.c && cd ..
+cd $1 && mv template.c $1.c && mv template.h $1.h && cd ..
