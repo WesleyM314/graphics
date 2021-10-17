@@ -17,14 +17,17 @@
 #include "proj2.h"
 
 #define BUFFER_OFFSET(offset) ((GLvoid *)(offset))
+#define DEBUG 0
 
 GLuint ctm_location;
 
 vec4 *vertices;
 vec4 *colors;
+vec2 *tex_coords;
 
 int num_vertices = 0;
 int num_colors = 0;
+int num_tex_coords = 0;
 GLboolean idleSpin = GL_FALSE;
 
 mat4 ctm;
@@ -58,6 +61,8 @@ mat4 rotateMat = {
     {0, 0, 0, 1},
 };
 
+char *filenameInput;
+
 /**
  * Idle animation
  */
@@ -68,6 +73,204 @@ void idle(void)
         ctm = multMat(&rotateMat, &ctm);
         glutPostRedisplay();
     }
+}
+
+/**
+ * Read ply file
+ */
+void readFile()
+{
+    // Prompt for ply filename
+    filenameInput = (char *)malloc(sizeof(char) * 25);
+    if (filenameInput == NULL)
+    {
+        printf("ERROR ALLOCATING MEMORY\n");
+        exit(0);
+    }
+    printf("\nEnter .ply file name (no file extension): ");
+    scanf("%s", filenameInput);
+
+    char *filename = (char *)malloc(sizeof(char) * 25);
+    strcpy(filename, filenameInput);
+    strcat(filename, ".ply");
+
+    // Attempt to open file for reading
+    FILE *f;
+    f = fopen(filename, "r");
+    while (f == NULL)
+    {
+        printf("ERROR: File '%s' could not be opened\n", filename);
+        printf("Enter .ply file name (no file extension): ");
+        scanf("%s", filenameInput);
+        strcpy(filename, filenameInput);
+        strcat(filename, ".ply");
+        f = fopen(filename, "r");
+    }
+
+    // Read line by line until 'end_header\n' found
+    char *buff;
+    size_t buffSize = 50;
+    buff = (char *)malloc(sizeof(char) * buffSize);
+    if (buff == NULL)
+    {
+        printf("Error allocating memory for buffer\n");
+        exit(0);
+    }
+
+    int numFileVerts = 0;
+    int faces = 0;
+    int numFileTexVerts = 0;
+
+    while (!strstr(buff, "end_header\n"))
+    {
+        getline(&buff, &buffSize, f);
+#if DEBUG
+        printf("READ LINE: %s", buff);
+#endif
+
+        // Find and extract num vertices in file
+        if (strstr(buff, " vertex "))
+        {
+            sscanf(buff, "%*s %*s %d", &numFileVerts);
+#if DEBUG
+            printf("FOUND VERTEX: ");
+            printf("%d\n", numFileVerts);
+#endif
+        }
+
+        // Find and extract num faces in object
+        if (strstr(buff, " face "))
+        {
+            sscanf(buff, "%*s %*s %d", &faces);
+#if DEBUG
+            printf("FOUND FACE: ");
+            printf("%d\n", faces);
+#endif
+        }
+
+        // Find and extract num texture vertices
+        if (strstr(buff, " multi_texture_vertex "))
+        {
+            sscanf(buff, "%*s %*s %d", &numFileTexVerts);
+#if DEBUG
+            printf("FOUND TEX VERTEX: ");
+            printf("%d\n", numFileTexVerts);
+#endif
+        }
+    }
+
+    // Allocate space for vertices
+    // Each face has 3 vertices
+    vertices = (vec4 *)malloc(sizeof(vec4) * faces * 3);
+    // Allocate space for tex vertices
+    tex_coords = (vec2 *)malloc(sizeof(vec2) * faces * 3);
+
+    // Allocate space to load vertex coordinates
+    // from file
+    vec4 *fileVerts = (vec4 *)malloc(sizeof(vec4) * numFileVerts);
+    if (fileVerts == NULL)
+    {
+        printf("Error allocating memory for file vertex list\n");
+        exit(0);
+    }
+    // Load floats x, y, and z numFileVerts times
+    GLfloat x, y, z;
+    for (int i = 0; i < numFileVerts; i++)
+    {
+        fread(&x, sizeof(x), 1, f);
+        fread(&y, sizeof(y), 1, f);
+        fread(&z, sizeof(z), 1, f);
+        fileVerts[i] = v4(x, y, z, 1.0);
+    }
+
+    // Read vertex indices and copy corresponding
+    // vec4 from fileVerts to vertices
+    char num;
+    int index;
+    for (int i = 0; i < faces; i++)
+    {
+        // Read num
+        fread(&num, sizeof(num), 1, f);
+        // Read num indices
+        for (int j = 0; j < num; j++)
+        {
+            fread(&index, sizeof(index), 1, f);
+            // Check index bounds
+            if (index >= numFileVerts)
+            {
+                printf("ERROR: loaded index out of bounds\n");
+                printf("Index: %c\tnumFileVerts: %d", index, numFileVerts);
+                exit(0);
+            }
+            // Copy from fileVerts to vertices
+            vertices[num_vertices++] = fileVerts[index];
+        }
+    }
+
+    // Allocate space to load tex coords
+    vec2 *file_tex = (vec2 *)malloc(sizeof(vec2) * numFileTexVerts);
+    if (file_tex == NULL)
+    {
+        printf("Error allocating memory for file tex coord list\n");
+        exit(0);
+    }
+
+    // Load floats u and v numFileTexVerts times
+    GLfloat u, v;
+    for (int i = 0; i < numFileTexVerts; i++)
+    {
+        // We don't care about the leading char tx
+        fread(&num, sizeof(num), 1, f);
+        fread(&u, sizeof(u), 1, f);
+        fread(&v, sizeof(v), 1, f);
+        file_tex[i] = v2(u, v);
+    }
+
+    // Read vertex indices and copy corresponding
+    // vec2 from file_tex to tex_coords
+    char tx;
+    int tn;
+
+    for (int i = 0; i < faces; i++)
+    {
+        // Read and ignore tx and tn
+        fread(&tx, sizeof(tx), 1, f);
+        fread(&tn, sizeof(tn), 1, f);
+
+        // Read num
+        fread(&num, sizeof(num), 1, f);
+        // Read num indices
+        for (int j = 0; j < num; j++)
+        {
+            fread(&index, sizeof(index), 1, f);
+            // Check index bounds
+            if (index >= numFileTexVerts)
+            {
+                printf("ERROR: loaded index out of bounds\n");
+                printf("Index: %d\tnumFileTexVerts: %d\n", index, numFileTexVerts);
+                exit(0);
+            }
+            // Copy from file_tex to tex_coords
+            tex_coords[num_tex_coords++] = file_tex[index];
+        }
+    }
+
+    fclose(f);
+
+#if DEBUG
+    printf("\nNum vertices: %d\n", num_vertices);
+    printf("Num tex vertices: %d\n", num_tex_coords);
+
+    printf("First vertex: ");
+    printVec(&vertices[0]);
+    printf("Last vertex: ");
+    printVec(&vertices[num_vertices - 1]);
+
+    printf("First texture coord: ");
+    printVec2(&tex_coords[0]);
+    printf("Last texture coord: ");
+    printVec2(&tex_coords[num_tex_coords - 1]);
+#endif
 }
 
 /**
@@ -176,8 +379,35 @@ void randColors(void)
 
 void init(void)
 {
+
+    // Load texture data
+    GLubyte my_texels[TEXW][TEXH][3];
+    char *fn = (char *)malloc(sizeof(char) * 25);
+    fn = strcat(filenameInput, ".data");
+    FILE *f = fopen(fn, "r");
+    if (f == NULL)
+    {
+        printf("Error: couldn't open file %s\n", fn);
+        exit(0);
+    }
+    fread(my_texels, TEXW * TEXH * 3, 1, f);
+    fclose(f);
+
     GLuint program = initShader("vshader.glsl", "fshader.glsl");
     glUseProgram(program);
+
+    // More texture stuff
+    GLuint mytex[1];
+    glGenTextures(1, mytex);
+    glBindTexture(GL_TEXTURE_2D, mytex[0]);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, TEXW, TEXH, 0, GL_RGB, GL_UNSIGNED_BYTE, my_texels);
+    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+
+    int param;
+    glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_WIDTH, &param);
 
     GLuint vao;
     glGenVertexArrays(1, &vao);
@@ -186,9 +416,10 @@ void init(void)
     GLuint buffer;
     glGenBuffers(1, &buffer);
     glBindBuffer(GL_ARRAY_BUFFER, buffer);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vec4) * num_vertices + sizeof(vec4) * num_colors, NULL, GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(vec4) * num_vertices + sizeof(vec4) * num_colors + sizeof(vec2) * num_tex_coords, NULL, GL_STATIC_DRAW);
     glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(vec4) * num_vertices, vertices);
     glBufferSubData(GL_ARRAY_BUFFER, sizeof(vec4) * num_vertices, sizeof(vec4) * num_colors, colors);
+    glBufferSubData(GL_ARRAY_BUFFER, sizeof(vec4) * num_vertices * 2, sizeof(vec2) * num_tex_coords, tex_coords);
 
     GLuint vPosition = glGetAttribLocation(program, "vPosition");
     glEnableVertexAttribArray(vPosition);
@@ -198,9 +429,20 @@ void init(void)
     glEnableVertexAttribArray(vColor);
     glVertexAttribPointer(vColor, 4, GL_FLOAT, GL_FALSE, 0, (GLvoid *)(sizeof(vec4) * num_vertices));
 
+    // Texture stuff
+    GLuint vTexCoord = glGetAttribLocation(program, "vTexCoord");
+    glEnableVertexAttribArray(vTexCoord);
+    glVertexAttribPointer(vTexCoord, 2, GL_FLOAT, GL_FALSE, 0, (GLvoid *)(sizeof(vec4) * num_vertices * 2));
+
+    // Locate texture
+    GLuint texture_location = glGetUniformLocation(program, "texture");
+    glUniform1i(texture_location, 0);
+    printf("texture_location: %i\n", texture_location);
+
     // Locate CTM
     ctm_location = glGetUniformLocation(program, "ctm");
 
+    glEnable(GL_CULL_FACE);
     glEnable(GL_DEPTH_TEST);
     glClearColor(0.0, 0.0, 0.0, 1.0);
     glDepthRange(1, 0);
@@ -348,6 +590,57 @@ void motion(int x, int y)
     glutPostRedisplay();
 }
 
+/**
+ * Center object and scale to fit in 
+ * field of view
+ */
+void centerScale()
+{
+    // Find bounds of points
+    GLfloat minx = 0, maxx = 0, miny = 0, maxy = 0, minz = 0, maxz = 0;
+    for (int i = 0; i < num_vertices; i++)
+    {
+        minx = vertices[i].x < minx ? vertices[i].x : minx;
+        maxx = vertices[i].x > maxx ? vertices[i].x : maxx;
+
+        miny = vertices[i].y < miny ? vertices[i].y : miny;
+        maxy = vertices[i].y > maxy ? vertices[i].y : maxy;
+
+        minz = vertices[i].z < minz ? vertices[i].z : minz;
+        maxz = vertices[i].z > maxz ? vertices[i].z : maxz;
+    }
+
+    // Center point
+    vec4 center = v4((maxx + minx) / 2, (maxy + miny) / 2, (maxz + minz) / 2, 1);
+
+    // Find largest range, use that to scale
+    GLfloat scaleFactor;
+
+    GLfloat xrange, yrange, zrange;
+    xrange = abs(maxx - minx);
+    yrange = abs(maxy - miny);
+    zrange = abs(maxz - minz);
+
+    scaleFactor = xrange;
+    if (yrange > scaleFactor)
+        scaleFactor = yrange;
+    if (zrange > scaleFactor)
+        scaleFactor = zrange;
+
+    scaleFactor = 2 / scaleFactor;
+
+    // Translate so midpoint == origin, then scale
+    mat4 t = translate(-center.x, -center.y, -center.z);
+    mat4 s = scale(scaleFactor, scaleFactor, scaleFactor);
+    mat4 tr = multMat(&s, &t);
+
+    // Translate and scale all vertices
+    for (int i = 0; i < num_vertices; i++)
+    {
+        vertices[i] = multMatVec(&tr, &vertices[i]);
+    }
+}
+
 void keyboard(unsigned char key, int mousex, int mousey)
 {
     if (key == 'q')
@@ -373,12 +666,13 @@ int main(int argc, char **argv)
     glutInitDisplayMode(GLUT_RGBA | GLUT_DOUBLE | GLUT_DEPTH);
     glutInitWindowSize(WSIZE, WSIZE);
     glutInitWindowPosition(100, 100);
-    glutCreateWindow("Template");
+    glutCreateWindow("Project 2");
     glewInit();
 
     ctm = identity();
     // INSERT SHAPE DRAWING FUNCTIONS HERE
-    unitSphere();   // REPLACE ME
+    readFile();
+    centerScale();
     randColors();
 
     init();

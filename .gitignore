@@ -63,3 +63,6 @@ dkms.conf
 *.txt
 !README.txt
 
+# Ignore large files in proj2
+proj2/*.data
+proj2/*.ply

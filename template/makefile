@@ -1,5 +1,5 @@
 CC       = gcc 
-CFLAGS   = -O3 -Wall 
+CFLAGS   = -O3 -Wall -Wno-unused-result
 LIBS      = -lXi -lXmu -lglut -lGLEW -lGLU -lm -lGL
 OBJDIR   = ../lib
 OBJS     = $(OBJDIR)/initShader.o $(OBJDIR)/lib.o

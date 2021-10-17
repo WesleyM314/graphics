@@ -4,6 +4,17 @@
 
 // VECTORS
 
+vec2 v2(GLfloat x, GLfloat y)
+{
+	vec2 v = {x, y};
+	return v;
+}
+
+void printVec2(vec2 *v)
+{
+	printf("[%10.4f %10.4f]\n\n", v->x, v->y);
+}
+
 /**
  * Vector constructor
  */
