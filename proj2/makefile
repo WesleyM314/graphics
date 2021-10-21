@@ -10,8 +10,5 @@ proj2: proj2.c $(OBJS)
 $(OBJDIR)/%.o: %.c %.h
 	$(CC) -c @< -o $@ $(CFLAGS)
 
-file: proj2
-	./proj2 file
-
-ball: proj2
-	./proj2 ball
+run: proj2
+	./proj2

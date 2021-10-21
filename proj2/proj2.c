@@ -17,7 +17,7 @@
 #include "proj2.h"
 
 #define BUFFER_OFFSET(offset) ((GLvoid *)(offset))
-#define DEBUG 1
+#define DEBUG 0
 
 GLuint ctm_location;
 
@@ -227,12 +227,6 @@ void readFile()
             flb = (GLfloat)b;
             // Scale from [0, 255] to [0.0, 1.0]
             fileColors[i] = v4(flr / 255.0, flg / 255.0, flb / 255.0, 1.0);
-            if (i == 0)
-            {
-                printf("\nr: %d\tg: %d\tb: %d\n", r, g, b);
-                printf("flr: %f\tflg: %f\tflb: %f\n", flr, flg, flb);
-                printVec(&fileColors[0]);
-            }
         }
     }
 
@@ -245,10 +239,6 @@ void readFile()
         // Read num
         fread(&num, sizeof(num), 1, f);
 
-        if (i == 0)
-        {
-            printf("num = %d\n", num);
-        }
         // Read num indices
         for (int j = 0; j < num; j++)
         {
@@ -427,11 +417,11 @@ void unitSphere(void)
     }
 
     // Create texture coordinates
-    for(int i = 0; i < num_vertices; i++)
+    for (int i = 0; i < num_vertices; i++)
     {
         GLfloat tex_x, tex_y;
-        tex_x = (vertices[i].x + 1.0) / 2.0;
-        tex_y = (vertices[i].y - 1) / -2 ;
+        tex_x = (vertices[i].x + 1.0) / 4.0;
+        tex_y = (vertices[i].y - 1) / -4.0;
         tex_coords[num_tex_coords++] = v2(tex_x, tex_y);
     }
 
@@ -498,10 +488,10 @@ void init(void)
     // Load texture for ball
     else if (!usefile)
     {
-        FILE *f = fopen("8ball.data", "r");
-        if(f == NULL)
+        FILE *f = fopen("ball.data", "r");
+        if (f == NULL)
         {
-            printf("Error: couldn't open 8ball.data\n");
+            printf("Error: couldn't open ball.data\n");
             exit(0);
         }
         fread(my_texels, texw * texh * 3, 1, f);
@@ -801,6 +791,20 @@ void reshape(int width, int height)
 
 int main(int argc, char **argv)
 {
+    char choice, check;
+    do
+    {
+        printf("\nWhich would you like to do? Enter a number.\n");
+        printf("1) Display 8-Ball\n");
+        printf("2) Load a PLY file\n");
+        printf("3) Quit\n");
+        printf("> ");
+        choice = (char)getchar();
+        check = choice == '1' || choice == '2' || choice == '3';
+        if (!check)
+            printf("INVALID CHOICE\n");
+    } while (!check);
+
     glutInit(&argc, argv);
     glutInitDisplayMode(GLUT_RGBA | GLUT_DOUBLE | GLUT_DEPTH);
     glutInitWindowSize(WSIZE, WSIZE);
@@ -810,36 +814,27 @@ int main(int argc, char **argv)
 
     ctm = identity();
     // INSERT SHAPE DRAWING FUNCTIONS HERE
-    if (argc != 2)
+    switch (choice)
     {
-        printf("Error: wrong number of arguments\n");
-        printf("Usage: proj2 ball | file\n");
-        exit(0);
-    }
-    if (!strcmp(argv[1], "ball"))
-    {
+    case '1':
         texw = 320;
         texh = 320;
         unitSphere();
-        // hasColors = GL_TRUE;
-        randColors();
-    }
-    else if (!strcmp(argv[1], "file"))
-    {
+        break;
+    case '2':
         usefile = GL_TRUE;
         texw = 1024;
         texh = 1024;
         readFile();
-        if(hasColors)
-        {
-            // free(colors);
-            // num_colors = 0;
-            // randColors();
-        }
+        break;
+    case '3':
+        exit(0);
+    default:
+        printf("Invalid choice\n");
+        break;
     }
-    // readFile();
+
     centerScale();
-    // randColors();
 
     init();
     glutDisplayFunc(display);
