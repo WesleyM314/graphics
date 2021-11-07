@@ -24,11 +24,27 @@ typedef struct
 
 typedef GLfloat vec4Arr[4];
 
+// A dynamically resizing list of vec4
+typedef struct 
+{
+	vec4 *items;
+	int capacity;
+	int length;
+} v4List;
+
 typedef struct
 {
 	GLfloat x;
 	GLfloat y;
 } vec2;
+
+// A dynamically resizing list of vec2
+typedef struct 
+{
+	vec2 *items;
+	int capacity;
+	int length;
+} v2List;
 
 typedef struct
 {
@@ -78,3 +94,11 @@ mat4 scale(GLfloat x, GLfloat y, GLfloat z);
 mat4 x_rotate(GLfloat theta);
 mat4 y_rotate(GLfloat theta);
 mat4 z_rotate(GLfloat theta);
+
+void v4ListNew(v4List *list);
+void v4ListResize(v4List *list, int capacity);
+void v4ListPush(v4List *list, vec4 item);
+
+void v2ListNew(v2List *list);
+void v2ListResize(v2List *list, int capacity);
+void v2ListPush(v2List *list, vec2 item);

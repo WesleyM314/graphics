@@ -1,7 +1,7 @@
 /*
- * template.c
+ * proj3.c
  *
- * An OpenGL source code template.
+ * An OpenGL source code proj3.
  */
 
 #include <GL/glew.h>
@@ -9,15 +9,16 @@
 #include <GL/freeglut_ext.h>
 #include <stdio.h>
 #include <string.h>
+#include <ctype.h>
 #include <math.h>
 #include <time.h>
 
 #include "../lib/initShader.h"
 #include "../lib/lib.h"
-#include "template.h"
+#include "proj3.h"
 
 #define BUFFER_OFFSET(offset) ((GLvoid *)(offset))
-#define DEBUG 0
+#define DEBUG 1
 
 GLuint ctm_location;
 
@@ -33,6 +34,9 @@ GLboolean hasColors = GL_FALSE;
 int texw, texh;
 
 mat4 ctm;
+
+// Find bounds of points
+GLfloat minx = 0, maxx = 0, miny = 0, maxy = 0, minz = 0, maxz = 0;
 
 // Variables for mouse movements/dragging
 vec4 curPoint = (vec4){0, 0, 0, 1};
@@ -479,15 +483,175 @@ void reshape(int width, int height)
     glViewport(0, 0, WSIZE, WSIZE);
 }
 
+/**
+ * Read and parse city.obj
+ */
+void readFile()
+{
+    FILE *f = fopen("city.obj", "r");
+    const char delim[2] = " "; // Delimiter for tokenizing strings
+    char *token;               // Token
+    size_t buf_len = 1024;
+    char *line = (char *)malloc(buf_len);                 // Buffer to read one line
+    char **faces = (char **)malloc(sizeof(char *) * 100); // Buffer to read face values
+
+    // fgets(line, buf_len, f);
+    // // Check line type - first token
+    // token = strtok(line, delim);
+    // printf("FIRST TOKEN = %s\n", token);
+    // printf("Line after strtok: %s\n", line);
+    // exit(0);
+    // token = strtok(line, delim);
+    // // Read other tokens in line
+    // while(token != NULL)
+    // {
+    //     printf("token: %s\n", token);
+    //     token = strtok(line, delim);
+    // }
+    // exit(0);
+
+    // Use a dynamically resizing list to load
+    // values since file size is unknown
+    // Raw vertices
+    v4List vertTemp;
+    v4ListNew(&vertTemp);
+
+    // Vertices ordered according to faces
+    v4List vertOrdered;
+    v4ListNew(&vertOrdered);
+
+    // Raw texture coords
+    v2List texTemp;
+    v2ListNew(&texTemp);
+
+    // Ordered texture coords according to faces
+    v2List texOrdered;
+    v2ListNew(&texOrdered);
+
+    // Read file one line at a time until EOF
+    GLfloat x, y, z, s, t;
+    vec4 v;
+    vec2 vt;
+    while (fgets(line, buf_len, f) != NULL)
+    {
+        // Check line type - first token
+        token = strtok(line, delim);
+
+        // Handle different line types
+        // Vertex
+        if (!strcmp(token, "v"))
+        {
+            // Read x, y, and z
+            token = strtok(NULL, delim);
+            sscanf(token, "%f", &x);
+            token = strtok(NULL, delim);
+            sscanf(token, "%f", &y);
+            token = strtok(NULL, delim);
+            sscanf(token, "%f", &z);
+            v = v4(x, y, z, 1.0);
+
+            // Add to vertTemp
+            v4ListPush(&vertTemp, v);
+
+            // Keep track of x, y, z bounds
+        }
+        // Texture vertex
+        else if (!strcmp(token, "vt"))
+        {
+            // Read s and t
+            token = strtok(NULL, delim);
+            sscanf(token, "%f", &s);
+            token = strtok(NULL, delim);
+            sscanf(token, "%f", &t);
+            // Unflip t
+            t = 1.0 - t;
+            vt = v2(s, t);
+
+            // Add to texTemp
+            v2ListPush(&texTemp, vt);
+        }
+        // Face
+        else if (!strcmp(token, "f"))
+        {
+            // Load vert indeces into faces and count
+            int numfaces = 0;
+            token = strtok(NULL, delim);
+            while (token != NULL)
+            {
+                faces[numfaces++] = token;
+                token = strtok(NULL, delim);
+            }
+            // If numfaces < 3 something went wrong
+            if (numfaces < 3)
+            {
+                printf("Error: less than 3 indices on face line\n");
+                exit(1);
+            }
+
+            // Loop over faces in pattern specified in instructions
+            // 1,2,3; 1,3,4; 1,4,5; etc.
+            int vi, ti; // Vert index, tex index
+            for (int i = 0; i < numfaces - 2; i++)
+            {
+                // Entry 0
+                sscanf(faces[0], "%d/%d", &vi, &ti);
+                v4ListPush(&vertOrdered, vertTemp.items[vi]);
+                v2ListPush(&texOrdered, texTemp.items[ti - 1]); // Texture index starts at 1
+
+                // Entry 1 + i
+                sscanf(faces[1 + i], "%d/%d", &vi, &ti);
+                v4ListPush(&vertOrdered, vertTemp.items[vi]);
+                v2ListPush(&texOrdered, texTemp.items[ti - 1]); // Texture index starts at 1
+
+                // Entry 2 + i
+                sscanf(faces[2 + i], "%d/%d", &vi, &ti);
+                v4ListPush(&vertOrdered, vertTemp.items[vi]);
+                v2ListPush(&texOrdered, texTemp.items[ti - 1]); // Texture index starts at 1
+            }
+        }
+    }
+
+#if DEBUG
+    printf("vertTemp capacity:\t%d\n", vertTemp.capacity);
+    printf("vertTemp length:\t%d\n", vertTemp.length);
+    printf("texTemp capacity:\t%d\n", texTemp.capacity);
+    printf("texTemp length:\t\t%d\n\n", texTemp.length);
+
+    printf("vertOrdered capacity:\t%d\n", vertOrdered.capacity);
+    printf("vertOrdered length:\t%d\n", vertOrdered.length);
+    printf("texOrdered capacity:\t%d\n", texOrdered.capacity);
+    printf("texOrdered length:\t%d\n", texOrdered.length);
+
+#endif
+
+    // Transfer vertOrdered and texOrdered to vertices and tex_coords
+    vertices = vertOrdered.items;
+    tex_coords = texOrdered.items;
+
+    // Free memory of vertTemp and texTemp
+    free(vertTemp.items);
+    free(texTemp.items);
+}
+
 int main(int argc, char **argv)
 {
+    // int foo, bar;
+    // char str[] = "1/2";
+    // printf("String: %s\n", str);
+    // sscanf(str, "%d/%d", &foo, &bar);
+    // printf("foo: %d\tbar: %d\n", foo, bar);
+    // exit(0);
     // TODO user menu, set texw & texh, set hasColors
+    texw = 1024;
+    texh = 1024;
+    hasColors = GL_FALSE;
+    readFile();
 
     glutInit(&argc, argv);
     glutInitDisplayMode(GLUT_RGBA | GLUT_DOUBLE | GLUT_DEPTH);
     glutInitWindowSize(WSIZE, WSIZE);
     glutInitWindowPosition(100, 100);
-    glutCreateWindow("Template");
+    glutCreateWindow("Project 3");
     glewInit();
 
     ctm = identity();
@@ -506,3 +670,47 @@ int main(int argc, char **argv)
 
     return 0;
 }
+
+// Functions for dynamic floatList
+
+// // Init a list
+// void listNew(floatList *l)
+// {
+//     l->capacity = 512;
+//     l->items = (GLfloat *)malloc(sizeof(GLfloat) * l->capacity);
+//     l->total = 0;
+// }
+
+// // Resize an array list
+// void listResize(floatList *list, int capacity)
+// {
+//     if (list)
+//     {
+//         GLfloat *items = (GLfloat *)realloc(list->items, sizeof(GLfloat) * capacity);
+//         if (items)
+//         {
+//             list->items = items;
+//             list->capacity = capacity;
+//             return;
+//         }
+//         printf("Error allocating memory for array list\n");
+//         exit(1);
+//     }
+// }
+
+// // Add to an array list
+// void listPush(floatList *list, GLfloat item)
+// {
+//     if (list)
+//     {
+//         // Check if list is full
+//         if (list->capacity == list->total)
+//         {
+//             // Double in size
+//             listResize(list, list->capacity * 2);
+//         }
+//         // Add to end of list
+//         list->items[list->total] = item;
+//         list->total += 1;
+//     }
+// }

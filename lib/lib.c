@@ -500,3 +500,89 @@ mat4 z_rotate(GLfloat theta)
 
 	return r;
 }
+
+// FUNCTIONS FOR DYNAMIC LISTS
+
+// Init v4List
+void v4ListNew(v4List *list)
+{
+	list->capacity = 512;
+	list->items = (vec4 *)malloc(sizeof(vec4) * list->capacity);
+	list->length = 0;
+}
+
+// Resize v4List
+void v4ListResize(v4List *list, int capacity)
+{
+	if(list)
+	{
+		vec4 *items = (vec4 *)realloc(list->items, sizeof(vec4) * capacity);
+		if(items)
+		{
+			list->items = items;
+			list->capacity = capacity;
+			return;
+		}
+		printf("Error reallocating memory for v4List\n");
+		exit(1);
+	}
+}
+
+// Add to v4List
+void v4ListPush(v4List *list, vec4 item)
+{
+	if(list)
+	{
+		// Check if list is full
+		if(list->capacity == list->length)
+		{
+			// Double in size
+			v4ListResize(list, list->capacity * 2);
+		}
+		// Add to end of list
+		list->items[list->length] = item;
+		list->length += 1;
+	}
+}
+
+// Init v2List
+void v2ListNew(v2List *list)
+{
+	list->capacity = 512;
+	list->items = (vec2 *)malloc(sizeof(vec2) * list->capacity);
+	list->length = 0;
+}
+
+// Resize v2List
+void v2ListResize(v2List *list, int capacity)
+{
+	if(list)
+	{
+		vec2 *items = (vec2 *)realloc(list->items, sizeof(vec2) * capacity);
+		if(items)
+		{
+			list->items = items;
+			list->capacity = capacity;
+			return;
+		}
+		printf("Error reallocating memory for v2List\n");
+		exit(1);
+	}
+}
+
+// Add to v2List
+void v2ListPush(v2List *list, vec2 item)
+{
+	if(list)
+	{
+		// Check if list is full
+		if(list->capacity == list->length)
+		{
+			// Double in size
+			v2ListResize(list, list->capacity * 2);
+		}
+		// Add to end of list
+		list->items[list->length] = item;
+		list->length += 1;
+	}
+}
