@@ -26,6 +26,12 @@ typedef GLfloat vec4Arr[4];
 
 typedef struct
 {
+	GLfloat x;
+	GLfloat y;
+} vec2;
+
+typedef struct
+{
 	vec4 x;
 	vec4 y;
 	vec4 z;
@@ -36,6 +42,8 @@ typedef GLfloat mat4Arr[16];
 
 // Function Signatures
 
+vec2 v2(GLfloat x, GLfloat y);
+void printVec2(vec2 *v);
 vec4 v4(GLfloat x, GLfloat y, GLfloat z, GLfloat w);
 void printVec(vec4 *v);
 void vecToArr(vec4 *v, vec4Arr arr);
