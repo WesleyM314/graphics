@@ -1,5 +1,5 @@
 CC       = gcc 
-CFLAGS   = -O3 -Wall -Wno-unused-result
+CFLAGS   = -O3 -Wall -Wno-unused-result -Wno-maybe-uninitialized
 LIBS      = -lXi -lXmu -lglut -lGLEW -lGLU -lm -lGL
 OBJDIR   = ../lib
 OBJS     = $(OBJDIR)/initShader.o $(OBJDIR)/lib.o
@@ -9,4 +9,7 @@ template: template.c $(OBJS)
 
 $(OBJDIR)/%.o: %.c %.h
 	$(CC) -c @< -o $@ $(CFLAGS)
+
+run: template
+	./template
 

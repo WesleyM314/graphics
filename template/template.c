@@ -17,15 +17,20 @@
 #include "template.h"
 
 #define BUFFER_OFFSET(offset) ((GLvoid *)(offset))
+#define DEBUG 0
 
 GLuint ctm_location;
 
 vec4 *vertices;
 vec4 *colors;
+vec2 *tex_coords;
 
 int num_vertices = 0;
 int num_colors = 0;
+int num_tex_coords = 0;
 GLboolean idleSpin = GL_FALSE;
+GLboolean hasColors = GL_FALSE;
+int texw, texh;
 
 mat4 ctm;
 
@@ -176,8 +181,49 @@ void randColors(void)
 
 void init(void)
 {
+
+    // Load texture data
+    GLubyte my_texels[texw][texh][3];
+
+    // TODO
+    // Load texture from file
+    char *fn = (char *)malloc(sizeof(char) * 25);
+    fn = "filename_here";
+    FILE *f = fopen(fn, "r");
+    if (f == NULL)
+    {
+        printf("Error: couldn't open file %s\n", fn);
+    }
+    fread(my_texels, texw * texh * 3, 1, f);
+    fclose(f);
+
     GLuint program = initShader("vshader.glsl", "fshader.glsl");
     glUseProgram(program);
+
+    if (hasColors)
+    {
+        glUniform1i(glGetUniformLocation(program, "use_color"), 1);
+    }
+    else
+    {
+        glUniform1i(glGetUniformLocation(program, "use_color"), 0);
+    }
+
+    // More texture stuff
+    if (!hasColors)
+    {
+        GLuint mytex[1];
+        glGenTextures(1, mytex);
+        glBindTexture(GL_TEXTURE_2D, mytex[0]);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, texw, texh, 0, GL_RGB, GL_UNSIGNED_BYTE, my_texels);
+        glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+        glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+        glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+
+        int param;
+        glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_WIDTH, &param);
+    }
 
     GLuint vao;
     glGenVertexArrays(1, &vao);
@@ -186,9 +232,10 @@ void init(void)
     GLuint buffer;
     glGenBuffers(1, &buffer);
     glBindBuffer(GL_ARRAY_BUFFER, buffer);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vec4) * num_vertices + sizeof(vec4) * num_colors, NULL, GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(vec4) * num_vertices + sizeof(vec4) * num_colors + sizeof(vec2) * num_tex_coords, NULL, GL_STATIC_DRAW);
     glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(vec4) * num_vertices, vertices);
     glBufferSubData(GL_ARRAY_BUFFER, sizeof(vec4) * num_vertices, sizeof(vec4) * num_colors, colors);
+    glBufferSubData(GL_ARRAY_BUFFER, sizeof(vec4) * num_vertices + sizeof(vec4) * num_colors, sizeof(vec2) * num_tex_coords, tex_coords);
 
     GLuint vPosition = glGetAttribLocation(program, "vPosition");
     glEnableVertexAttribArray(vPosition);
@@ -198,9 +245,22 @@ void init(void)
     glEnableVertexAttribArray(vColor);
     glVertexAttribPointer(vColor, 4, GL_FLOAT, GL_FALSE, 0, (GLvoid *)(sizeof(vec4) * num_vertices));
 
+    // Texture stuff
+    if (!hasColors)
+    {
+        GLuint vTexCoord = glGetAttribLocation(program, "vTexCoord");
+        glEnableVertexAttribArray(vTexCoord);
+        glVertexAttribPointer(vTexCoord, 2, GL_FLOAT, GL_FALSE, 0, (GLvoid *)(sizeof(vec4) * num_vertices + sizeof(vec4) * num_colors));
+        // Locate texture
+        GLuint texture_location = glGetUniformLocation(program, "texture");
+        glUniform1i(texture_location, 0);
+        printf("texture_location: %i\n", texture_location);
+    }
+
     // Locate CTM
     ctm_location = glGetUniformLocation(program, "ctm");
 
+    glEnable(GL_CULL_FACE);
     glEnable(GL_DEPTH_TEST);
     glClearColor(0.0, 0.0, 0.0, 1.0);
     glDepthRange(1, 0);
@@ -348,6 +408,57 @@ void motion(int x, int y)
     glutPostRedisplay();
 }
 
+/**
+ * Center object and scale to fit in 
+ * field of view
+ */
+void centerScale()
+{
+    // Find bounds of points
+    GLfloat minx = 0, maxx = 0, miny = 0, maxy = 0, minz = 0, maxz = 0;
+    for (int i = 0; i < num_vertices; i++)
+    {
+        minx = vertices[i].x < minx ? vertices[i].x : minx;
+        maxx = vertices[i].x > maxx ? vertices[i].x : maxx;
+
+        miny = vertices[i].y < miny ? vertices[i].y : miny;
+        maxy = vertices[i].y > maxy ? vertices[i].y : maxy;
+
+        minz = vertices[i].z < minz ? vertices[i].z : minz;
+        maxz = vertices[i].z > maxz ? vertices[i].z : maxz;
+    }
+
+    // Center point
+    vec4 center = v4((maxx + minx) / 2, (maxy + miny) / 2, (maxz + minz) / 2, 1);
+
+    // Find largest range, use that to scale
+    GLfloat scaleFactor;
+
+    GLfloat xrange, yrange, zrange;
+    xrange = abs(maxx - minx);
+    yrange = abs(maxy - miny);
+    zrange = abs(maxz - minz);
+
+    scaleFactor = xrange;
+    if (yrange > scaleFactor)
+        scaleFactor = yrange;
+    if (zrange > scaleFactor)
+        scaleFactor = zrange;
+
+    scaleFactor = 2 / scaleFactor;
+
+    // Translate so midpoint == origin, then scale
+    mat4 t = translate(-center.x, -center.y, -center.z);
+    mat4 s = scale(scaleFactor, scaleFactor, scaleFactor);
+    mat4 tr = multMat(&s, &t);
+
+    // Translate and scale all vertices
+    for (int i = 0; i < num_vertices; i++)
+    {
+        vertices[i] = multMatVec(&tr, &vertices[i]);
+    }
+}
+
 void keyboard(unsigned char key, int mousex, int mousey)
 {
     if (key == 'q')
@@ -369,6 +480,8 @@ void reshape(int width, int height)
 
 int main(int argc, char **argv)
 {
+    // TODO user menu, set texw & texh, set hasColors
+
     glutInit(&argc, argv);
     glutInitDisplayMode(GLUT_RGBA | GLUT_DOUBLE | GLUT_DEPTH);
     glutInitWindowSize(WSIZE, WSIZE);
@@ -378,7 +491,7 @@ int main(int argc, char **argv)
 
     ctm = identity();
     // INSERT SHAPE DRAWING FUNCTIONS HERE
-    unitSphere();   // REPLACE ME
+    unitSphere(); // REPLACE ME
     randColors();
 
     init();
