@@ -21,6 +21,7 @@
 #define DEBUG 1
 
 GLuint ctm_location;
+GLuint colorflag_location;
 
 vec4 *vertices;
 vec4 *colors;
@@ -189,14 +190,11 @@ void init(void)
     // Load texture data
     GLubyte my_texels[texw][texh][3];
 
-    // TODO
     // Load texture from file
-    char *fn = (char *)malloc(sizeof(char) * 25);
-    fn = "filename_here";
-    FILE *f = fopen(fn, "r");
+    FILE *f = fopen("city.data", "r");
     if (f == NULL)
     {
-        printf("Error: couldn't open file %s\n", fn);
+        printf("Error: couldn't open file city.data\n");
         exit(0);
     }
     fread(my_texels, texw * texh * 3, 1, f);
@@ -264,6 +262,8 @@ void init(void)
 
     // Locate CTM
     ctm_location = glGetUniformLocation(program, "ctm");
+    // Locate colorflag
+    colorflag_location = glGetUniformLocation(program, "use_color");
 
     glEnable(GL_CULL_FACE);
     glEnable(GL_DEPTH_TEST);
@@ -280,7 +280,10 @@ void display(void)
 
     glUniformMatrix4fv(ctm_location, 1, GL_FALSE, (GLfloat *)&ctm);
 
-    glDrawArrays(GL_TRIANGLES, 0, num_vertices);
+    glUniform1i(colorflag_location, 0);
+    glDrawArrays(GL_TRIANGLES, 0, num_vertices - 6);
+    glUniform1i(colorflag_location, 1);
+    glDrawArrays(GL_TRIANGLES, num_vertices - 6, 6);
 
     glutSwapBuffers();
 }
@@ -553,7 +556,12 @@ void readFile()
             // Add to vertTemp
             v4ListPush(&vertTemp, v);
 
-            // Keep track of x, y, z bounds
+            minx = x < minx ? x : minx;
+            maxx = x > maxx ? x : maxx;
+            miny = y < miny ? y : miny;
+            maxy = y > maxy ? y : maxy;
+            minz = z < minz ? z : minz;
+            maxz = z > maxz ? z : maxz;
         }
         // Texture vertex
         else if (!strcmp(token, "vt"))
@@ -587,6 +595,18 @@ void readFile()
                 printf("Error: less than 3 indices on face line\n");
                 exit(1);
             }
+            char tempflag = (vertOrdered.length == 0);
+#if DEBUG
+            if (tempflag)
+            {
+                printf("numfaces: %d\n", numfaces);
+                for (int i = 0; i < numfaces; i++)
+                {
+                    printf("%s ", faces[i]);
+                }
+                printf("\n");
+            }
+#endif
 
             // Loop over faces in pattern specified in instructions
             // 1,2,3; 1,3,4; 1,4,5; etc.
@@ -595,17 +615,29 @@ void readFile()
             {
                 // Entry 0
                 sscanf(faces[0], "%d/%d", &vi, &ti);
-                v4ListPush(&vertOrdered, vertTemp.items[vi]);
+#if DEBUG
+                if (tempflag)
+                    printf("vi: %d\tvt: %d\n", vi, ti);
+#endif
+                v4ListPush(&vertOrdered, vertTemp.items[vi - 1]);
                 v2ListPush(&texOrdered, texTemp.items[ti - 1]); // Texture index starts at 1
 
                 // Entry 1 + i
                 sscanf(faces[1 + i], "%d/%d", &vi, &ti);
-                v4ListPush(&vertOrdered, vertTemp.items[vi]);
+#if DEBUG
+                if (tempflag)
+                    printf("vi: %d\tvt: %d\n", vi, ti);
+#endif
+                v4ListPush(&vertOrdered, vertTemp.items[vi - 1]);
                 v2ListPush(&texOrdered, texTemp.items[ti - 1]); // Texture index starts at 1
 
                 // Entry 2 + i
                 sscanf(faces[2 + i], "%d/%d", &vi, &ti);
-                v4ListPush(&vertOrdered, vertTemp.items[vi]);
+#if DEBUG
+                if (tempflag)
+                    printf("vi: %d\tvt: %d\n\n", vi, ti);
+#endif
+                v4ListPush(&vertOrdered, vertTemp.items[vi - 1]);
                 v2ListPush(&texOrdered, texTemp.items[ti - 1]); // Texture index starts at 1
             }
         }
@@ -622,11 +654,58 @@ void readFile()
     printf("texOrdered capacity:\t%d\n", texOrdered.capacity);
     printf("texOrdered length:\t%d\n", texOrdered.length);
 
+    printf("\nminx: %f\t", minx);
+    printf("maxx: %f\t", maxx);
+
+    printf("\n\nFirst vertex SHOULD BE:\n");
+    printVec(&vertTemp.items[882]);
+    printf("First vertex is:\n");
+    printVec(&vertOrdered.items[0]);
+
 #endif
+    // Add ground
+    v4ListPush(&vertOrdered, v4(minx, 0, maxz, 1));
+    v4ListPush(&vertOrdered, v4(maxx, 0, maxz, 1));
+    v4ListPush(&vertOrdered, v4(maxx, 0, minz, 1));
+
+    v4ListPush(&vertOrdered, v4(maxx, 0, minz, 1));
+    v4ListPush(&vertOrdered, v4(minx, 0, minz, 1));
+    v4ListPush(&vertOrdered, v4(minx, 0, maxz, 1));
+
+    // Translate so all x >= 0, y >= 0, z <= 0
+    mat4 m1 = translate(-minx, -miny, -maxz);
+    // Scale by 100
+    mat4 m2 = scale(4.5, 4.5, 4.5);
+    mat4 m3 = multMat(&m2, &m1);
+    for (int i = 0; i < vertOrdered.length; i++)
+    {
+        vertOrdered.items[i] = multMatVec(&m3, &vertOrdered.items[i]);
+    }
 
     // Transfer vertOrdered and texOrdered to vertices and tex_coords
     vertices = vertOrdered.items;
+    num_vertices += vertOrdered.length;
     tex_coords = texOrdered.items;
+    num_tex_coords += texOrdered.length;
+
+    // TODO ask if this can be optimized
+    // Fill colors with last 6 entries being green for ground
+    num_colors = num_vertices - 6;
+    colors = (vec4 *)malloc(sizeof(vec4) * num_colors);
+    for (int i = 0; i < num_colors; i++)
+    {
+        colors[i] = v4(1, 1, 1, 1);
+    }
+
+    for (int i = 0; i < 6; i++)
+    {
+        colors[num_colors++] = v4(0.11, 0.647, 0.188, 1);
+    }
+
+#if DEBUG
+    printf("Done loading from file!\n");
+    printf("num_verts: %d\tnum_tex: %d\n", num_vertices, num_tex_coords);
+#endif
 
     // Free memory of vertTemp and texTemp
     free(vertTemp.items);
@@ -641,7 +720,6 @@ int main(int argc, char **argv)
     // sscanf(str, "%d/%d", &foo, &bar);
     // printf("foo: %d\tbar: %d\n", foo, bar);
     // exit(0);
-    // TODO user menu, set texw & texh, set hasColors
     texw = 1024;
     texh = 1024;
     hasColors = GL_FALSE;
@@ -656,8 +734,8 @@ int main(int argc, char **argv)
 
     ctm = identity();
     // INSERT SHAPE DRAWING FUNCTIONS HERE
-    unitSphere(); // REPLACE ME
-    randColors();
+    // unitSphere(); // REPLACE ME
+    // randColors();
 
     init();
     glutDisplayFunc(display);
@@ -670,47 +748,3 @@ int main(int argc, char **argv)
 
     return 0;
 }
-
-// Functions for dynamic floatList
-
-// // Init a list
-// void listNew(floatList *l)
-// {
-//     l->capacity = 512;
-//     l->items = (GLfloat *)malloc(sizeof(GLfloat) * l->capacity);
-//     l->total = 0;
-// }
-
-// // Resize an array list
-// void listResize(floatList *list, int capacity)
-// {
-//     if (list)
-//     {
-//         GLfloat *items = (GLfloat *)realloc(list->items, sizeof(GLfloat) * capacity);
-//         if (items)
-//         {
-//             list->items = items;
-//             list->capacity = capacity;
-//             return;
-//         }
-//         printf("Error allocating memory for array list\n");
-//         exit(1);
-//     }
-// }
-
-// // Add to an array list
-// void listPush(floatList *list, GLfloat item)
-// {
-//     if (list)
-//     {
-//         // Check if list is full
-//         if (list->capacity == list->total)
-//         {
-//             // Double in size
-//             listResize(list, list->capacity * 2);
-//         }
-//         // Add to end of list
-//         list->items[list->total] = item;
-//         list->total += 1;
-//     }
-// }
