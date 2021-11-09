@@ -19,6 +19,7 @@
 
 #define BUFFER_OFFSET(offset) ((GLvoid *)(offset))
 #define DEBUG 1
+#define MOVE_SPEED 0.02
 
 GLuint ctm_location;
 GLuint model_view_location;
@@ -45,6 +46,16 @@ GLfloat left, right, top, bottom, near, far;
 
 // Find bounds of points
 GLfloat minx = 0, maxx = 0, miny = 0, maxy = 0, minz = 0, maxz = 0;
+
+// Flags for movement
+GLboolean forward_flag = GL_FALSE;
+GLboolean back_flag = GL_FALSE;
+GLboolean left_flag = GL_FALSE;
+GLboolean right_flag = GL_FALSE;
+GLboolean turnleft_flag = GL_FALSE;
+GLboolean turnright_flag = GL_FALSE;
+GLboolean lookup_flag = GL_FALSE;
+GLboolean lookdown_flag = GL_FALSE;
 
 // Variables for mouse movements/dragging
 vec4 curPoint = (vec4){0, 0, 0, 1};
@@ -80,11 +91,67 @@ mat4 rotateMat = {
  */
 void idle(void)
 {
-    if (idleSpin)
+    // if (idleSpin)
+    // {
+    //     ctm = multMat(&rotateMat, &ctm);
+    //     glutPostRedisplay();
+    // }
+
+    // Handle movement
+    // Should allow for multiple
+    // movement directions at once
+    mat4 m = identity();
+    mat4 tr;
+    // Forward
+    if (forward_flag)
     {
-        ctm = multMat(&rotateMat, &ctm);
-        glutPostRedisplay();
+        tr = translate(0, 0, MOVE_SPEED);
+        m = multMat(&tr, &m);
     }
+    // Back
+    if (back_flag)
+    {
+        tr = translate(0, 0, -MOVE_SPEED);
+        m = multMat(&tr, &m);
+    }
+    // Left
+    if (left_flag)
+    {
+        tr = translate(MOVE_SPEED, 0, 0);
+        m = multMat(&tr, &m);
+    }
+    // Right
+    if (right_flag)
+    {
+        tr = translate(-MOVE_SPEED, 0, 0);
+        m = multMat(&tr, &m);
+    }
+    // Turn left
+    if (turnleft_flag)
+    {
+        tr = y_rotate(-0.005);
+        m = multMat(&tr, &m);
+    }
+    // Turn right
+    if (turnright_flag)
+    {
+        tr = y_rotate(0.005);
+        m = multMat(&tr, &m);
+    }
+    // Look up
+    if (lookup_flag)
+    {
+        tr = x_rotate(-0.005);
+        m = multMat(&tr, &m);
+    }
+    // Look down
+    if (lookdown_flag)
+    {
+        tr = x_rotate(0.005);
+        m = multMat(&tr, &m);
+    }
+    model_view = multMat(&m, &model_view);
+    glutPostRedisplay();
 }
 
 /**
@@ -482,32 +549,113 @@ void centerScale()
 
 void keyboard(unsigned char key, int mousex, int mousey)
 {
+    // Quit
     if (key == 'q')
         glutLeaveMainLoop();
-    if (key == 't')
-    {
-        mat4 id = identity();
-        model_view = equalMats(&model_view, &id)
-                         ? look_at(v4(0, 1, 0, 1.0), v4(0, 0.1, -1, 1), v4(0, 1, 0, 0))
-                         : identity();
-    }
-    if (key == 'p')
-    {
-        mat4 id = identity();
-        projection = equalMats(&projection, &id)
-                         ? perspective(-0.5, 0.5, -0.5, 0.5, -1, -10)
-                         : identity();
-    }
+    // Reset
     if (key == 'r')
     {
         ctm = identity();
         model_view = identity();
-        projection = identity();
         rotateMat = identity();
         glutPostRedisplay();
     }
+    // Move left
+    if (key == 'j')
+    {
+        left_flag = GL_TRUE;
+    }
+    // Move right
+    if (key == 'l')
+    {
+        right_flag = GL_TRUE;
+    }
+}
 
-    //glutPostRedisplay();
+void keyboardUp(unsigned char key, int mousex, int mousey)
+{
+
+    // Move left
+    if (key == 'j')
+    {
+        left_flag = GL_FALSE;
+    }
+    // Move right
+    if (key == 'l')
+    {
+        right_flag = GL_FALSE;
+    }
+}
+
+/**
+ * Special keys - downpress
+ */
+void keySpecial(int key, int mousex, int mousey)
+{
+    // Up arrow
+    if (key == GLUT_KEY_UP)
+    {
+        forward_flag = GL_TRUE;
+    }
+    // Down arrow
+    if (key == GLUT_KEY_DOWN)
+    {
+        back_flag = GL_TRUE;
+    }
+    // Right arrow
+    if (key == GLUT_KEY_RIGHT)
+    {
+        turnright_flag = GL_TRUE;
+    }
+    // Left arrow
+    if (key == GLUT_KEY_LEFT)
+    {
+        turnleft_flag = GL_TRUE;
+    }
+    // Page up
+    if (key == GLUT_KEY_PAGE_UP)
+    {
+        lookup_flag = GL_TRUE;
+    }
+    // Page down
+    if (key == GLUT_KEY_PAGE_DOWN)
+    {
+        lookdown_flag = GL_TRUE;
+    }
+}
+
+void keySpecialUp(int key, int mousex, int mousey)
+{
+    // Up arrow
+    if (key == GLUT_KEY_UP)
+    {
+        forward_flag = GL_FALSE;
+    }
+    // Down arrow
+    if (key == GLUT_KEY_DOWN)
+    {
+        back_flag = GL_FALSE;
+    }
+    // Right arrow
+    if (key == GLUT_KEY_RIGHT)
+    {
+        turnright_flag = GL_FALSE;
+    }
+    // Left arrow
+    if (key == GLUT_KEY_LEFT)
+    {
+        turnleft_flag = GL_FALSE;
+    }
+    // Page up
+    if (key == GLUT_KEY_PAGE_UP)
+    {
+        lookup_flag = GL_FALSE;
+    }
+    // Page down
+    if (key == GLUT_KEY_PAGE_DOWN)
+    {
+        lookdown_flag = GL_FALSE;
+    }
 }
 
 void reshape(int width, int height)
@@ -526,21 +674,6 @@ void readFile()
     size_t buf_len = 1024;
     char *line = (char *)malloc(buf_len);                 // Buffer to read one line
     char **faces = (char **)malloc(sizeof(char *) * 100); // Buffer to read face values
-
-    // fgets(line, buf_len, f);
-    // // Check line type - first token
-    // token = strtok(line, delim);
-    // printf("FIRST TOKEN = %s\n", token);
-    // printf("Line after strtok: %s\n", line);
-    // exit(0);
-    // token = strtok(line, delim);
-    // // Read other tokens in line
-    // while(token != NULL)
-    // {
-    //     printf("token: %s\n", token);
-    //     token = strtok(line, delim);
-    // }
-    // exit(0);
 
     // Use a dynamically resizing list to load
     // values since file size is unknown
@@ -743,12 +876,6 @@ void readFile()
 
 int main(int argc, char **argv)
 {
-    // int foo, bar;
-    // char str[] = "1/2";
-    // printf("String: %s\n", str);
-    // sscanf(str, "%d/%d", &foo, &bar);
-    // printf("foo: %d\tbar: %d\n", foo, bar);
-    // exit(0);
     texw = 1024;
     texh = 1024;
     hasColors = GL_FALSE;
@@ -763,14 +890,14 @@ int main(int argc, char **argv)
 
     ctm = identity();
     model_view = identity();
-    projection = identity();
-    // INSERT SHAPE DRAWING FUNCTIONS HERE
-    // unitSphere(); // REPLACE ME
-    // randColors();
+    projection = perspective(-0.2, 0.2, -0.2, 0.2, -1, -10);
 
     init();
     glutDisplayFunc(display);
     glutKeyboardFunc(keyboard);
+    glutKeyboardUpFunc(keyboardUp);
+    glutSpecialFunc(keySpecial);
+    glutSpecialUpFunc(keySpecialUp);
     glutMouseFunc(mouse);
     glutMotionFunc(motion);
     // glutReshapeFunc(reshape);
