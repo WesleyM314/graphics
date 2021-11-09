@@ -21,6 +21,8 @@
 #define DEBUG 1
 
 GLuint ctm_location;
+GLuint model_view_location;
+GLuint projection_location;
 GLuint colorflag_location;
 
 vec4 *vertices;
@@ -35,6 +37,11 @@ GLboolean hasColors = GL_FALSE;
 int texw, texh;
 
 mat4 ctm;
+mat4 model_view;
+mat4 projection;
+
+// Perspective projection variables
+GLfloat left, right, top, bottom, near, far;
 
 // Find bounds of points
 GLfloat minx = 0, maxx = 0, miny = 0, maxy = 0, minz = 0, maxz = 0;
@@ -262,6 +269,10 @@ void init(void)
 
     // Locate CTM
     ctm_location = glGetUniformLocation(program, "ctm");
+    // Locate model_view
+    model_view_location = glGetUniformLocation(program, "model_view");
+    // Locate pojection
+    projection_location = glGetUniformLocation(program, "projection");
     // Locate colorflag
     colorflag_location = glGetUniformLocation(program, "use_color");
 
@@ -279,6 +290,8 @@ void display(void)
     glPolygonMode(GL_BACK, GL_LINE);
 
     glUniformMatrix4fv(ctm_location, 1, GL_FALSE, (GLfloat *)&ctm);
+    glUniformMatrix4fv(model_view_location, 1, GL_FALSE, (GLfloat *)&model_view);
+    glUniformMatrix4fv(projection_location, 1, GL_FALSE, (GLfloat *)&projection);
 
     glUniform1i(colorflag_location, 0);
     glDrawArrays(GL_TRIANGLES, 0, num_vertices - 6);
@@ -471,9 +484,25 @@ void keyboard(unsigned char key, int mousex, int mousey)
 {
     if (key == 'q')
         glutLeaveMainLoop();
+    if (key == 't')
+    {
+        mat4 id = identity();
+        model_view = equalMats(&model_view, &id)
+                         ? look_at(v4(0, 1, 0, 1.0), v4(0, 0.1, -1, 1), v4(0, 1, 0, 0))
+                         : identity();
+    }
+    if (key == 'p')
+    {
+        mat4 id = identity();
+        projection = equalMats(&projection, &id)
+                         ? perspective(-0.5, 0.5, -0.5, 0.5, -1, -10)
+                         : identity();
+    }
     if (key == 'r')
     {
         ctm = identity();
+        model_view = identity();
+        projection = identity();
         rotateMat = identity();
         glutPostRedisplay();
     }
@@ -675,7 +704,7 @@ void readFile()
     // Translate so all x >= 0, y >= 0, z <= 0
     mat4 m1 = translate(-minx, -miny, -maxz);
     // Scale by 100
-    mat4 m2 = scale(4.5, 4.5, 4.5);
+    mat4 m2 = scale(10, 10, 10);
     mat4 m3 = multMat(&m2, &m1);
     for (int i = 0; i < vertOrdered.length; i++)
     {
@@ -733,6 +762,8 @@ int main(int argc, char **argv)
     glewInit();
 
     ctm = identity();
+    model_view = identity();
+    projection = identity();
     // INSERT SHAPE DRAWING FUNCTIONS HERE
     // unitSphere(); // REPLACE ME
     // randColors();

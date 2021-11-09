@@ -61,6 +61,17 @@ char equalVecs(vec4 *m, vec4 *n)
 	return (m->x == n->x && m->y == n->y && m->z == n->z && m->w == n->w) ? 1 : 0;
 }
 
+char equalMats(mat4 *m, mat4 *n)
+{
+	return (
+			   equalVecs(&m->x, &n->x) &&
+			   equalVecs(&m->y, &n->y) &&
+			   equalVecs(&m->z, &n->z) &&
+			   equalVecs(&m->w, &n->w))
+			   ? 1
+			   : 0;
+}
+
 /**
  * Multiplies a vector by a scalar value, returning
  * a new 4x1 vector
@@ -501,6 +512,57 @@ mat4 z_rotate(GLfloat theta)
 	return r;
 }
 
+// PERSPECTIVE FUNCTIONS
+
+/**
+ * Returns transformation matrix to look at
+ * a certain point
+ */
+mat4 look_at(vec4 eye, vec4 at, vec4 up)
+{
+	mat4 m;
+
+	// VPN is eye - at; normalize to n
+	vec4 n = subVec(&eye, &at);
+	n = normalize(&n);
+
+	// u is (up cross n) normalized
+	vec4 u = crossVec(&up, &n);
+	u = normalize(&u);
+
+	// v is (n cross u) normalized
+	vec4 v = crossVec(&n, &u);
+	v = normalize(&v);
+
+	// p is just eye
+	// Construct model-view matrix
+	// M = [u;v;n;eye]
+	// Place in columns, then transpose for ease
+	// and readability of code
+	m = m4(u, v, n, eye);
+	m = transpose(&m);
+
+	return m;
+}
+
+/**
+ * Return a perspective projection matrix 
+ */
+mat4 perspective(GLfloat left, GLfloat right, GLfloat bottom,
+				 GLfloat top, GLfloat near, GLfloat far)
+{
+	vec4 x, y, z, w;
+	x = v4((-2 * near) / (right - left), 0, 0, 0);
+	y = v4(0, (-2 * near) / (top - bottom), 0, 0);
+	z = v4(
+		(left + right) / (right - left),
+		(bottom + top) / (top - bottom),
+		(near + far) / (far - near), -1);
+	w = v4(0, 0, (-2 * near * far) / (far - near), 0);
+
+	return m4(x, y, z, w);
+}
+
 // FUNCTIONS FOR DYNAMIC LISTS
 
 // Init v4List
@@ -514,10 +576,10 @@ void v4ListNew(v4List *list)
 // Resize v4List
 void v4ListResize(v4List *list, int capacity)
 {
-	if(list)
+	if (list)
 	{
 		vec4 *items = (vec4 *)realloc(list->items, sizeof(vec4) * capacity);
-		if(items)
+		if (items)
 		{
 			list->items = items;
 			list->capacity = capacity;
@@ -531,10 +593,10 @@ void v4ListResize(v4List *list, int capacity)
 // Add to v4List
 void v4ListPush(v4List *list, vec4 item)
 {
-	if(list)
+	if (list)
 	{
 		// Check if list is full
-		if(list->capacity == list->length)
+		if (list->capacity == list->length)
 		{
 			// Double in size
 			v4ListResize(list, list->capacity * 2);
@@ -556,10 +618,10 @@ void v2ListNew(v2List *list)
 // Resize v2List
 void v2ListResize(v2List *list, int capacity)
 {
-	if(list)
+	if (list)
 	{
 		vec2 *items = (vec2 *)realloc(list->items, sizeof(vec2) * capacity);
-		if(items)
+		if (items)
 		{
 			list->items = items;
 			list->capacity = capacity;
@@ -573,10 +635,10 @@ void v2ListResize(v2List *list, int capacity)
 // Add to v2List
 void v2ListPush(v2List *list, vec2 item)
 {
-	if(list)
+	if (list)
 	{
 		// Check if list is full
-		if(list->capacity == list->length)
+		if (list->capacity == list->length)
 		{
 			// Double in size
 			v2ListResize(list, list->capacity * 2);

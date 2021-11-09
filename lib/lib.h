@@ -1,5 +1,5 @@
 
-#ifdef __APPLE__  // include Mac OS X verions of headers
+#ifdef __APPLE__ // include Mac OS X verions of headers
 
 #include <OpenGL/OpenGL.h>
 #include <GLUT/glut.h>
@@ -10,7 +10,7 @@
 #include <GL/freeglut.h>
 #include <GL/freeglut_ext.h>
 
-#endif  // __APPLE__
+#endif // __APPLE__
 
 // STRUCTS
 
@@ -25,7 +25,7 @@ typedef struct
 typedef GLfloat vec4Arr[4];
 
 // A dynamically resizing list of vec4
-typedef struct 
+typedef struct
 {
 	vec4 *items;
 	int capacity;
@@ -39,7 +39,7 @@ typedef struct
 } vec2;
 
 // A dynamically resizing list of vec2
-typedef struct 
+typedef struct
 {
 	vec2 *items;
 	int capacity;
@@ -65,6 +65,7 @@ void printVec(vec4 *v);
 void vecToArr(vec4 *v, vec4Arr arr);
 void arrToVec(vec4Arr arr, vec4 *v);
 char equalVecs(vec4 *m, vec4 *n);
+char equalMats(mat4 *m, mat4 *n);
 vec4 multScalVec(vec4 *v, float s);
 vec4 addVec(vec4 *v, vec4 *u);
 vec4 subVec(vec4 *v, vec4 *u);
@@ -94,6 +95,10 @@ mat4 scale(GLfloat x, GLfloat y, GLfloat z);
 mat4 x_rotate(GLfloat theta);
 mat4 y_rotate(GLfloat theta);
 mat4 z_rotate(GLfloat theta);
+
+mat4 look_at(vec4 eye, vec4 at, vec4 up);
+mat4 perspective(GLfloat left, GLfloat right, GLfloat bottom,
+				 GLfloat top, GLfloat near, GLfloat far);
 
 void v4ListNew(v4List *list);
 void v4ListResize(v4List *list, int capacity);
