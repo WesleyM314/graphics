@@ -20,6 +20,14 @@
 #define BUFFER_OFFSET(offset) ((GLvoid *)(offset))
 #define DEBUG 1
 #define MOVE_SPEED 0.02
+// #define WALK_MODE 0
+// #define MAP_MODE 1
+
+typedef enum
+{
+    MAP,
+    WALK
+} mode;
 
 GLuint ctm_location;
 GLuint model_view_location;
@@ -33,8 +41,8 @@ vec2 *tex_coords;
 int num_vertices = 0;
 int num_colors = 0;
 int num_tex_coords = 0;
-GLboolean idleSpin = GL_FALSE;
-GLboolean hasColors = GL_FALSE;
+GLboolean idle_spin = GL_FALSE;
+GLboolean has_colors = GL_FALSE;
 int texw, texh;
 
 mat4 ctm;
@@ -44,8 +52,14 @@ mat4 projection;
 // Perspective projection variables
 GLfloat left, right, top, bottom, near, far;
 
+// Elevation of eyeline above y=0 plane
+GLfloat base_eye_level = 0.05;
+
 // Find bounds of points
 GLfloat minx = 0, maxx = 0, miny = 0, maxy = 0, minz = 0, maxz = 0;
+
+// Current mode
+mode curMode = WALK;
 
 // Flags for movement
 GLboolean forward_flag = GL_FALSE;
@@ -57,10 +71,20 @@ GLboolean turnright_flag = GL_FALSE;
 GLboolean lookup_flag = GL_FALSE;
 GLboolean lookdown_flag = GL_FALSE;
 
+// Flags for animations
+GLboolean to_map_flag = GL_FALSE;
+GLboolean from_map_flag = GL_FALSE;
+// Values to help animation
+// GLfloat anim_theta = 0;
+GLfloat anim_d = 0;
+
+// Keep track of up/down camera angle
+GLfloat camera_theta = 0;
+
 // Variables for mouse movements/dragging
-vec4 curPoint = (vec4){0, 0, 0, 1};
-vec4 prevPoint = (vec4){0, 0, 0, 1};
-vec4 rotateAxis = (vec4){0, 0, 0, 1};
+vec4 cur_point = (vec4){0, 0, 0, 1};
+vec4 prev_point = (vec4){0, 0, 0, 1};
+vec4 rotate_axis = (vec4){0, 0, 0, 1};
 mat4 rx = {
     {1, 0, 0, 0},
     {0, 1, 0, 0},
@@ -79,7 +103,7 @@ mat4 rz = {
     {0, 0, 1, 0},
     {0, 0, 0, 1},
 };
-mat4 rotateMat = {
+mat4 rotate_mat = {
     {1, 0, 0, 0},
     {0, 1, 0, 0},
     {0, 0, 1, 0},
@@ -91,64 +115,150 @@ mat4 rotateMat = {
  */
 void idle(void)
 {
-    // if (idleSpin)
-    // {
-    //     ctm = multMat(&rotateMat, &ctm);
-    //     glutPostRedisplay();
-    // }
+    mat4 m = identity();
+    mat4 tr1, tr2, tr3; // Translation matrices
+
+    // Animate to map mode
+    if (to_map_flag == GL_TRUE)
+    {
+        // Look down until camera_theta = -90
+        if (camera_theta > -M_PI / 2)
+        {
+            tr1 = x_rotate(0.01);
+            camera_theta -= 0.01;
+            m = multMat(&tr1, &m);
+        }
+        // Move backward
+        else
+        {
+            // printf("TO MAP: done looking down\n");
+            // Move to 200 units above ground
+            if (anim_d < 50)
+            {
+                tr1 = translate(0, 0, -0.2);
+                anim_d += 0.2;
+                m = multMat(&tr1, &m);
+            }
+            else
+            {
+                // printf("TO MAP: done moving back\n");
+                to_map_flag = GL_FALSE;
+                printf("camera_theta: %f\n", camera_theta);
+                printf("anim_d: %f\n", anim_d);
+            }
+        }
+        // Redraw and return to ensure
+        // no movement while animating
+        model_view = multMat(&m, &model_view);
+        glutPostRedisplay();
+        return;
+    }
+
+    // Animate to walk mode
+    if (from_map_flag == GL_TRUE)
+    {
+        // TODO move in to ground
+        if (anim_d > base_eye_level)
+        {
+            tr1 = translate(0, 0, 0.2);
+            anim_d -= 0.2;
+            m = multMat(&tr1, &m);
+        }
+        // Look up until camera_theta = 0
+        else
+        {
+            if (camera_theta < 0)
+            {
+                tr1 = x_rotate(-0.01);
+                camera_theta += 0.01;
+                m = multMat(&tr1, &m);
+            }
+            else
+            {
+                // When animation done, return
+                // movement control
+                curMode = WALK;
+                from_map_flag = GL_FALSE;
+                printf("camera_theta: %f\n", camera_theta);
+                printf("anim_d: %f\n", anim_d);
+            }
+        }
+        // Redraw and return to ensure
+        // no movement while animating
+        model_view = multMat(&m, &model_view);
+        glutPostRedisplay();
+        return;
+    }
 
     // Handle movement
     // Should allow for multiple
     // movement directions at once
-    mat4 m = identity();
-    mat4 tr;
-    // Forward
-    if (forward_flag)
+    // Only move if in walk mode
+    if (curMode == WALK)
     {
-        tr = translate(0, 0, MOVE_SPEED);
-        m = multMat(&tr, &m);
-    }
-    // Back
-    if (back_flag)
-    {
-        tr = translate(0, 0, -MOVE_SPEED);
-        m = multMat(&tr, &m);
-    }
-    // Left
-    if (left_flag)
-    {
-        tr = translate(MOVE_SPEED, 0, 0);
-        m = multMat(&tr, &m);
-    }
-    // Right
-    if (right_flag)
-    {
-        tr = translate(-MOVE_SPEED, 0, 0);
-        m = multMat(&tr, &m);
-    }
-    // Turn left
-    if (turnleft_flag)
-    {
-        tr = y_rotate(-0.005);
-        m = multMat(&tr, &m);
-    }
-    // Turn right
-    if (turnright_flag)
-    {
-        tr = y_rotate(0.005);
-        m = multMat(&tr, &m);
-    }
-    // Look up
-    if (lookup_flag)
-    {
-        tr = x_rotate(-0.005);
-        m = multMat(&tr, &m);
-    }
-    // Look down
-    if (lookdown_flag)
-    {
-        tr = x_rotate(0.005);
-        m = multMat(&tr, &m);
+        // Forward
+        if (forward_flag)
+        {
+            // ACCOUNT FOR CAMERA ANGLE
+            // STAY ON Y = 0 PLANE
+            // Positive camera_theta == looking up
+            tr1 = x_rotate(camera_theta);      // Look at horizon
+            tr2 = translate(0, 0, MOVE_SPEED); // Move
+            tr3 = x_rotate(-camera_theta);     // Look back at original angle
+            tr1 = multMat(&tr2, &tr1);
+            tr1 = multMat(&tr3, &tr1);
+            m = multMat(&tr1, &m);
+        }
+        // Back
+        if (back_flag)
+        {
+            tr1 = x_rotate(camera_theta);
+            tr2 = translate(0, 0, -MOVE_SPEED);
+            tr3 = x_rotate(-camera_theta);
+            tr1 = multMat(&tr2, &tr1);
+            tr1 = multMat(&tr3, &tr1);
+            m = multMat(&tr1, &m);
+        }
+        // Left
+        if (left_flag)
+        {
+            tr1 = translate(MOVE_SPEED, 0, 0);
+            m = multMat(&tr1, &m);
+        }
+        // Right
+        if (right_flag)
+        {
+            tr1 = translate(-MOVE_SPEED, 0, 0);
+            m = multMat(&tr1, &m);
+        }
+        // Turn left
+        if (turnleft_flag)
+        {
+            tr1 = y_rotate(-0.005);
+            m = multMat(&tr1, &m);
+        }
+        // Turn right
+        if (turnright_flag)
+        {
+            tr1 = y_rotate(0.005);
+            m = multMat(&tr1, &m);
+        }
+        // Look up
+        if (lookup_flag)
+        {
+            tr1 = x_rotate(-0.005);
+            m = multMat(&tr1, &m);
+            // Update camera_theta
+            camera_theta += 0.005;
+        }
+        // Look down
+        if (lookdown_flag)
+        {
+            tr1 = x_rotate(0.005);
+            m = multMat(&tr1, &m);
+            // Update camera_theta
+            camera_theta -= 0.005;
+        }
     }
     model_view = multMat(&m, &model_view);
     glutPostRedisplay();
@@ -277,7 +387,7 @@ void init(void)
     GLuint program = initShader("vshader.glsl", "fshader.glsl");
     glUseProgram(program);
 
-    if (hasColors)
+    if (has_colors)
     {
         glUniform1i(glGetUniformLocation(program, "use_color"), 1);
     }
@@ -287,7 +397,7 @@ void init(void)
     }
 
     // More texture stuff
-    if (!hasColors)
+    if (!has_colors)
     {
         GLuint mytex[1];
         glGenTextures(1, mytex);
@@ -306,13 +416,22 @@ void init(void)
     glGenVertexArrays(1, &vao);
     glBindVertexArray(vao);
 
+    // Buffer setup
     GLuint buffer;
     glGenBuffers(1, &buffer);
     glBindBuffer(GL_ARRAY_BUFFER, buffer);
     glBufferData(GL_ARRAY_BUFFER, sizeof(vec4) * num_vertices + sizeof(vec4) * num_colors + sizeof(vec2) * num_tex_coords, NULL, GL_STATIC_DRAW);
-    glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(vec4) * num_vertices, vertices);
-    glBufferSubData(GL_ARRAY_BUFFER, sizeof(vec4) * num_vertices, sizeof(vec4) * num_colors, colors);
-    glBufferSubData(GL_ARRAY_BUFFER, sizeof(vec4) * num_vertices + sizeof(vec4) * num_colors, sizeof(vec2) * num_tex_coords, tex_coords);
+    // Buffer sections
+    int buff_offset = 0;
+    // Vertices
+    glBufferSubData(GL_ARRAY_BUFFER, buff_offset, sizeof(vec4) * num_vertices, vertices);
+    buff_offset += sizeof(vec4) * num_vertices;
+    // Colors
+    glBufferSubData(GL_ARRAY_BUFFER, buff_offset, sizeof(vec4) * num_colors, colors);
+    buff_offset += sizeof(vec4) * num_colors;
+    // Texture coords
+    glBufferSubData(GL_ARRAY_BUFFER, buff_offset, sizeof(vec2) * num_tex_coords, tex_coords);
+    buff_offset += sizeof(vec4) * num_tex_coords;
 
     GLuint vPosition = glGetAttribLocation(program, "vPosition");
     glEnableVertexAttribArray(vPosition);
@@ -323,7 +442,7 @@ void init(void)
     glVertexAttribPointer(vColor, 4, GL_FLOAT, GL_FALSE, 0, (GLvoid *)(sizeof(vec4) * num_vertices));
 
     // Texture stuff
-    if (!hasColors)
+    if (!has_colors)
     {
         GLuint vTexCoord = glGetAttribLocation(program, "vTexCoord");
         glEnableVertexAttribArray(vTexCoord);
@@ -360,8 +479,10 @@ void display(void)
     glUniformMatrix4fv(model_view_location, 1, GL_FALSE, (GLfloat *)&model_view);
     glUniformMatrix4fv(projection_location, 1, GL_FALSE, (GLfloat *)&projection);
 
+    // Draw city
     glUniform1i(colorflag_location, 0);
     glDrawArrays(GL_TRIANGLES, 0, num_vertices - 6);
+    // Draw ground
     glUniform1i(colorflag_location, 1);
     glDrawArrays(GL_TRIANGLES, num_vertices - 6, 6);
 
@@ -374,16 +495,16 @@ void mouse(int button, int state, int x, int y)
     {
         if (state == GLUT_DOWN)
         {
-            // On left button click, set curPoint
-            // prevPoint doesn't matter
+            // On left button click, set cur_point
+            // prev_point doesn't matter
             setCurPoint(x, y);
             // Stop rotation
-            rotateMat = identity();
-            idleSpin = GL_FALSE;
+            rotate_mat = identity();
+            idle_spin = GL_FALSE;
         }
         else if (state == GLUT_UP)
         {
-            idleSpin = GL_TRUE;
+            idle_spin = GL_TRUE;
         }
     }
     if (button == 3)
@@ -426,73 +547,73 @@ void setCurPoint(int x, int y)
         gl_z = sqrt(temp);
     }
 
-    // Set curPoint
-    curPoint = v4(gl_x, gl_y, gl_z, 1.0);
+    // Set cur_point
+    cur_point = v4(gl_x, gl_y, gl_z, 1.0);
 }
 
 void motion(int x, int y)
 {
-    // Move curPoint to prevPoint
-    prevPoint = curPoint;
+    // Move cur_point to prev_point
+    prev_point = cur_point;
 
-    // Set curPoint
+    // Set cur_point
     setCurPoint(x, y);
 
-    // return if curPoint and prevPoint are the same
+    // return if cur_point and prev_point are the same
     // to avoid NaN errors
-    if (equalVecs(&curPoint, &prevPoint))
+    if (equalVecs(&cur_point, &prev_point))
     {
         return;
     }
 
-    // Calculate angle between prevPoint and curPoint
+    // Calculate angle between prev_point and cur_point
     // Not sure why, but it seems I need to multiply by
     // 1.5 to have the unit sphere move more closely
     // with the mouse cursor
-    GLfloat theta = 1.5 * acosf(dotVec(&prevPoint, &curPoint) / (magnitude(&prevPoint) * magnitude(&curPoint)));
+    GLfloat theta = 1.5 * acosf(dotVec(&prev_point, &cur_point) / (magnitude(&prev_point) * magnitude(&cur_point)));
 
     // Object will be rotated about z by theta degrees
     rz = z_rotate(theta);
 
     // Calculate rotational axis using cross product
-    // of curPoint and prevPoint
-    rotateAxis = crossVec(&prevPoint, &curPoint);
+    // of cur_point and prev_point
+    rotate_axis = crossVec(&prev_point, &cur_point);
 
     // If rotation axis is zero vector (like when moving on a
     // diagonal off the edges of the "glass ball") just return
-    if (!rotateAxis.x && !rotateAxis.y && !rotateAxis.z)
+    if (!rotate_axis.x && !rotate_axis.y && !rotate_axis.z)
     {
         return;
     }
 
-    // Normalize rotateAxis
-    rotateAxis = normalize(&rotateAxis);
+    // Normalize rotate_axis
+    rotate_axis = normalize(&rotate_axis);
 
     // Use origin as fixed point
     // Rotate axis to plane y = 0
-    GLfloat d = sqrtf(rotateAxis.y * rotateAxis.y + rotateAxis.z * rotateAxis.z);
+    GLfloat d = sqrtf(rotate_axis.y * rotate_axis.y + rotate_axis.z * rotate_axis.z);
 
     if (d != 0)
     {
-        rx.y = (vec4){0, rotateAxis.z / d, rotateAxis.y / d, 0};
-        rx.z = (vec4){0, -rotateAxis.y / d, rotateAxis.z / d, 0};
+        rx.y = (vec4){0, rotate_axis.z / d, rotate_axis.y / d, 0};
+        rx.z = (vec4){0, -rotate_axis.y / d, rotate_axis.z / d, 0};
     }
 
     // Rotate axis to plane x = 0
-    ry.x = (vec4){d, 0, rotateAxis.x, 0};
-    ry.z = (vec4){-rotateAxis.x, 0, d, 0};
+    ry.x = (vec4){d, 0, rotate_axis.x, 0};
+    ry.z = (vec4){-rotate_axis.x, 0, d, 0};
 
     // Get final transformation matrix
-    rotateMat = multMat(&ry, &rx);
-    rotateMat = multMat(&rz, &rotateMat);
+    rotate_mat = multMat(&ry, &rx);
+    rotate_mat = multMat(&rz, &rotate_mat);
     // Transpose rx and ry
     rx = transpose(&rx);
     ry = transpose(&ry);
-    rotateMat = multMat(&ry, &rotateMat);
-    rotateMat = multMat(&rx, &rotateMat);
+    rotate_mat = multMat(&ry, &rotate_mat);
+    rotate_mat = multMat(&rx, &rotate_mat);
 
     // Update ctm
-    ctm = multMat(&rotateMat, &ctm);
+    ctm = multMat(&rotate_mat, &ctm);
     glutPostRedisplay();
 }
 
@@ -556,8 +677,10 @@ void keyboard(unsigned char key, int mousex, int mousey)
     if (key == 'r')
     {
         ctm = identity();
-        model_view = identity();
-        rotateMat = identity();
+        model_view = translate(0, -base_eye_level, 0);
+        // rotate_mat = identity();
+        anim_d = base_eye_level;
+        camera_theta = 0;
         glutPostRedisplay();
     }
     // Move left
@@ -569,6 +692,21 @@ void keyboard(unsigned char key, int mousex, int mousey)
     if (key == 'l')
     {
         right_flag = GL_TRUE;
+    }
+
+    // Animate to map mode
+    if (key == 'm')
+    {
+        curMode = MAP;
+        from_map_flag = GL_FALSE;
+        to_map_flag = GL_TRUE;
+    }
+
+    // Animate to walk mode
+    if (key == 'e')
+    {
+        to_map_flag = GL_FALSE;
+        from_map_flag = GL_TRUE;
     }
 }
 
@@ -864,6 +1002,14 @@ void readFile()
         colors[num_colors++] = v4(0.11, 0.647, 0.188, 1);
     }
 
+    // Try with just 6 colors
+    // num_colors = 6;
+    // colors = (vec4 *)malloc(sizeof(vec4) * num_colors);
+    // for (int i = 0; i < num_colors; i++)
+    // {
+    //     colors[i] = v4(0.11, 0.647, 0.188, 1);
+    // }
+
 #if DEBUG
     printf("Done loading from file!\n");
     printf("num_verts: %d\tnum_tex: %d\n", num_vertices, num_tex_coords);
@@ -878,7 +1024,8 @@ int main(int argc, char **argv)
 {
     texw = 1024;
     texh = 1024;
-    hasColors = GL_FALSE;
+    has_colors = GL_FALSE;
+    anim_d = base_eye_level;
     readFile();
 
     glutInit(&argc, argv);
@@ -890,7 +1037,9 @@ int main(int argc, char **argv)
 
     ctm = identity();
     model_view = identity();
-    projection = perspective(-0.2, 0.2, -0.2, 0.2, -1, -10);
+    // Move model_view up slightly to simulate eye level
+    model_view = translate(0, -base_eye_level, 0);
+    projection = perspective(-0.2, 0.2, -0.1, 0.2, -1, -150);
 
     init();
     glutDisplayFunc(display);

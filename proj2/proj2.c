@@ -28,7 +28,7 @@ vec2 *tex_coords;
 int num_vertices = 0;
 int num_colors = 0;
 int num_tex_coords = 0;
-GLboolean idleSpin = GL_FALSE;
+GLboolean idle_spin = GL_FALSE;
 GLboolean usefile = GL_FALSE;
 GLboolean hasColors = GL_FALSE;
 int texw, texh;
@@ -57,7 +57,7 @@ mat4 rz = {
     {0, 0, 1, 0},
     {0, 0, 0, 1},
 };
-mat4 rotateMat = {
+mat4 rotate_mat = {
     {1, 0, 0, 0},
     {0, 1, 0, 0},
     {0, 0, 1, 0},
@@ -71,9 +71,9 @@ char *filenameInput;
  */
 void idle(void)
 {
-    if (idleSpin)
+    if (idle_spin)
     {
-        ctm = multMat(&rotateMat, &ctm);
+        ctm = multMat(&rotate_mat, &ctm);
         glutPostRedisplay();
     }
 }
@@ -601,12 +601,12 @@ void mouse(int button, int state, int x, int y)
             // prevPoint doesn't matter
             setCurPoint(x, y);
             // Stop rotation
-            rotateMat = identity();
-            idleSpin = GL_FALSE;
+            rotate_mat = identity();
+            idle_spin = GL_FALSE;
         }
         else if (state == GLUT_UP)
         {
-            idleSpin = GL_TRUE;
+            idle_spin = GL_TRUE;
         }
     }
     if (button == 3)
@@ -706,16 +706,16 @@ void motion(int x, int y)
     ry.z = (vec4){-rotateAxis.x, 0, d, 0};
 
     // Get final transformation matrix
-    rotateMat = multMat(&ry, &rx);
-    rotateMat = multMat(&rz, &rotateMat);
+    rotate_mat = multMat(&ry, &rx);
+    rotate_mat = multMat(&rz, &rotate_mat);
     // Transpose rx and ry
     rx = transpose(&rx);
     ry = transpose(&ry);
-    rotateMat = multMat(&ry, &rotateMat);
-    rotateMat = multMat(&rx, &rotateMat);
+    rotate_mat = multMat(&ry, &rotate_mat);
+    rotate_mat = multMat(&rx, &rotate_mat);
 
     // Update ctm
-    ctm = multMat(&rotateMat, &ctm);
+    ctm = multMat(&rotate_mat, &ctm);
     glutPostRedisplay();
 }
 
@@ -777,7 +777,7 @@ void keyboard(unsigned char key, int mousex, int mousey)
     if (key == 'r')
     {
         ctm = identity();
-        rotateMat = identity();
+        rotate_mat = identity();
         glutPostRedisplay();
     }
 
