@@ -534,13 +534,25 @@ mat4 look_at(vec4 eye, vec4 at, vec4 up)
 	vec4 v = crossVec(&n, &u);
 	v = normalize(&v);
 
-	// p is just eye
-	// Construct model-view matrix
-	// M = [u;v;n;eye]
-	// Place in columns, then transpose for ease
-	// and readability of code
-	m = m4(u, v, n, eye);
-	m = transpose(&m);
+	// Make rotation matrix
+	mat4 R = m4(u, v, n, v4(0, 0, 0, 1));
+
+	R = transpose(&R);
+
+	// Make translation matrix
+	mat4 T = m4(
+		v4(1, 0, 0, -eye.x),
+		v4(0, 1, 0, -eye.y),
+		v4(0, 0, 1, -eye.z),
+		v4(0, 0, 0, 1));
+	T = transpose(&T);
+
+	T = translate(-eye.x, -eye.y, -eye.z);
+
+	// printf("LOOK_AT T:\n");
+	// printMat(&T);
+
+	m = multMat(&R, &T);
 
 	return m;
 }

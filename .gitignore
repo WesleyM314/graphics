@@ -66,3 +66,9 @@ dkms.conf
 # Ignore large files in proj2
 proj2/*.data
 proj2/*.ply
+
+# Ignore lecture slides
+slides/
+
+# Ignore test folder
+testing/

@@ -14,5 +14,5 @@ void main()
 {
 	texCoord = vTexCoord;
 	color = vColor;
-	gl_Position = projection * model_view * ctm * vPosition;
+	gl_Position = projection * model_view * vPosition;
 }

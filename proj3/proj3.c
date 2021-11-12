@@ -18,10 +18,9 @@
 #include "proj3.h"
 
 #define BUFFER_OFFSET(offset) ((GLvoid *)(offset))
-#define DEBUG 1
+#define DEBUG_FILE_INPUT 0
 #define MOVE_SPEED 0.02
-// #define WALK_MODE 0
-// #define MAP_MODE 1
+#define EYE_LEVEL 0.1 // y offset to simulate eye level
 
 typedef enum
 {
@@ -53,7 +52,12 @@ mat4 projection;
 GLfloat left, right, top, bottom, near, far;
 
 // Elevation of eyeline above y=0 plane
-GLfloat base_eye_level = 0.05;
+GLfloat base_eye_level = 0.5;
+
+// Position vectors related to look_at
+vec4 eye = (vec4){0, EYE_LEVEL, 0, 1}; // Start at origin
+vec4 at = (vec4){0, EYE_LEVEL, -1, 1}; // Look towards -z
+vec4 up = (vec4){0, 1, 0, 0};          // Up stays the same
 
 // Find bounds of points
 GLfloat minx = 0, maxx = 0, miny = 0, maxy = 0, minz = 0, maxz = 0;
@@ -75,7 +79,6 @@ GLboolean lookdown_flag = GL_FALSE;
 GLboolean to_map_flag = GL_FALSE;
 GLboolean from_map_flag = GL_FALSE;
 // Values to help animation
-// GLfloat anim_theta = 0;
 GLfloat anim_d = 0;
 
 // Keep track of up/down camera angle
@@ -115,6 +118,7 @@ mat4 rotate_mat = {
  */
 void idle(void)
 {
+
     mat4 m = identity();
     mat4 tr1, tr2, tr3; // Translation matrices
 
@@ -199,68 +203,94 @@ void idle(void)
         // Forward
         if (forward_flag)
         {
-            // ACCOUNT FOR CAMERA ANGLE
-            // STAY ON Y = 0 PLANE
-            // Positive camera_theta == looking up
-            tr1 = x_rotate(camera_theta);      // Look at horizon
-            tr2 = translate(0, 0, MOVE_SPEED); // Move
-            tr3 = x_rotate(-camera_theta);     // Look back at original angle
-            tr1 = multMat(&tr2, &tr1);
-            tr1 = multMat(&tr3, &tr1);
-            m = multMat(&tr1, &m);
+
+            // Use look_at
+            // Translate eye in direction of at
+            vec4 diff = subVec(&at, &eye);
+            // Normalize to unit vector for uniform movement
+            diff = normalize(&diff);
+            // Translate both eye and at in diff direction
+            // Do NOT translate in y direction
+            eye.x += diff.x / 100;
+            eye.z += diff.z / 100;
+            at.x += diff.x / 100;
+            at.z += diff.z / 100;
         }
         // Back
         if (back_flag)
         {
-            tr1 = x_rotate(camera_theta);
-            tr2 = translate(0, 0, -MOVE_SPEED);
-            tr3 = x_rotate(-camera_theta);
-            tr1 = multMat(&tr2, &tr1);
-            tr1 = multMat(&tr3, &tr1);
-            m = multMat(&tr1, &m);
+            // Translate eye in direction of at
+            vec4 diff = subVec(&at, &eye);
+            // Normalize to unit vector for uniform movement
+            diff = normalize(&diff);
+            // Translate both eye and at in diff direction
+            // Do NOT translate in y direction
+            eye.x -= diff.x / 100;
+            eye.z -= diff.z / 100;
+            at.x -= diff.x / 100;
+            at.z -= diff.z / 100;
         }
         // Left
         if (left_flag)
         {
-            tr1 = translate(MOVE_SPEED, 0, 0);
-            m = multMat(&tr1, &m);
+            // Move along relative x axis
+            vec4 z_prime = subVec(&eye, &at);
+            vec4 x_prime = crossVec(&up, &z_prime);
+
+            eye.x -= x_prime.x / 100;
+            eye.z -= x_prime.z / 100;
+            at.x -= x_prime.x / 100;
+            at.z -= x_prime.z / 100;
         }
         // Right
         if (right_flag)
         {
-            tr1 = translate(-MOVE_SPEED, 0, 0);
-            m = multMat(&tr1, &m);
+            // Move along relative x axis
+            vec4 z_prime = subVec(&eye, &at);
+            vec4 x_prime = crossVec(&up, &z_prime);
+
+            eye.x += x_prime.x / 100;
+            eye.z += x_prime.z / 100;
+            at.x += x_prime.x / 100;
+            at.z += x_prime.z / 100;
         }
         // Turn left
         if (turnleft_flag)
         {
-            tr1 = y_rotate(-0.005);
-            m = multMat(&tr1, &m);
+            // Translate at as if moving eye to origin,
+            // rotate, then translate along same vector
+            mat4 tr = translate(-eye.x, -eye.y, -eye.z);
+            mat4 r = y_rotate(0.005);
+            r = multMat(&r, &tr);
+            tr = translate(eye.x, eye.y, eye.z);
+            r = multMat(&tr, &r);
+            at = multMatVec(&r, &at);
         }
         // Turn right
         if (turnright_flag)
         {
-            tr1 = y_rotate(0.005);
-            m = multMat(&tr1, &m);
+            // Translate at as if moving eye to origin,
+            // rotate, then translate along same vector
+            mat4 tr = translate(-eye.x, -eye.y, -eye.z);
+            mat4 r = y_rotate(-0.005);
+            r = multMat(&r, &tr);
+            tr = translate(eye.x, eye.y, eye.z);
+            r = multMat(&tr, &r);
+            at = multMatVec(&r, &at);
         }
         // Look up
         if (lookup_flag)
         {
-            tr1 = x_rotate(-0.005);
-            m = multMat(&tr1, &m);
-            // Update camera_theta
-            camera_theta += 0.005;
+            at.y += 0.005;
         }
         // Look down
         if (lookdown_flag)
         {
-            tr1 = x_rotate(0.005);
-            m = multMat(&tr1, &m);
-            // Update camera_theta
-            camera_theta -= 0.005;
+            at.y -= 0.005;
         }
     }
-    model_view = multMat(&m, &model_view);
+
+    model_view = look_at(eye, at, up);
     glutPostRedisplay();
 }
 
@@ -677,11 +707,13 @@ void keyboard(unsigned char key, int mousex, int mousey)
     if (key == 'r')
     {
         ctm = identity();
-        model_view = translate(0, -base_eye_level, 0);
+        // model_view = translate(0, -base_eye_level, 0);
         // rotate_mat = identity();
         anim_d = base_eye_level;
         camera_theta = 0;
-        glutPostRedisplay();
+        eye = v4(0, EYE_LEVEL, 0, 1);
+        at = v4(0, EYE_LEVEL, -1, 1);
+        model_view = look_at(eye, at, up);
     }
     // Move left
     if (key == 'j')
@@ -707,6 +739,12 @@ void keyboard(unsigned char key, int mousex, int mousey)
     {
         to_map_flag = GL_FALSE;
         from_map_flag = GL_TRUE;
+    }
+
+    if (key == 't')
+    {
+        at.y += 0.005;
+        model_view = look_at(eye, at, up);
     }
 }
 
@@ -895,9 +933,9 @@ void readFile()
                 printf("Error: less than 3 indices on face line\n");
                 exit(1);
             }
+#if DEBUG_FILE_INPUT
             char tempflag = (vertOrdered.length == 0);
-#if DEBUG
-            if (tempflag)
+            0 if (tempflag)
             {
                 printf("numfaces: %d\n", numfaces);
                 for (int i = 0; i < numfaces; i++)
@@ -915,8 +953,8 @@ void readFile()
             {
                 // Entry 0
                 sscanf(faces[0], "%d/%d", &vi, &ti);
-#if DEBUG
-                if (tempflag)
+#if DEBUG_FILE_INPUT
+                0 if (tempflag)
                     printf("vi: %d\tvt: %d\n", vi, ti);
 #endif
                 v4ListPush(&vertOrdered, vertTemp.items[vi - 1]);
@@ -924,8 +962,8 @@ void readFile()
 
                 // Entry 1 + i
                 sscanf(faces[1 + i], "%d/%d", &vi, &ti);
-#if DEBUG
-                if (tempflag)
+#if DEBUG_FILE_INPUT
+                0 if (tempflag)
                     printf("vi: %d\tvt: %d\n", vi, ti);
 #endif
                 v4ListPush(&vertOrdered, vertTemp.items[vi - 1]);
@@ -933,8 +971,8 @@ void readFile()
 
                 // Entry 2 + i
                 sscanf(faces[2 + i], "%d/%d", &vi, &ti);
-#if DEBUG
-                if (tempflag)
+#if DEBUG_FILE_INPUT
+                0 if (tempflag)
                     printf("vi: %d\tvt: %d\n\n", vi, ti);
 #endif
                 v4ListPush(&vertOrdered, vertTemp.items[vi - 1]);
@@ -943,8 +981,8 @@ void readFile()
         }
     }
 
-#if DEBUG
-    printf("vertTemp capacity:\t%d\n", vertTemp.capacity);
+#if DEBUG_FILE_INPUT
+    0 printf("vertTemp capacity:\t%d\n", vertTemp.capacity);
     printf("vertTemp length:\t%d\n", vertTemp.length);
     printf("texTemp capacity:\t%d\n", texTemp.capacity);
     printf("texTemp length:\t\t%d\n\n", texTemp.length);
@@ -1002,16 +1040,8 @@ void readFile()
         colors[num_colors++] = v4(0.11, 0.647, 0.188, 1);
     }
 
-    // Try with just 6 colors
-    // num_colors = 6;
-    // colors = (vec4 *)malloc(sizeof(vec4) * num_colors);
-    // for (int i = 0; i < num_colors; i++)
-    // {
-    //     colors[i] = v4(0.11, 0.647, 0.188, 1);
-    // }
-
-#if DEBUG
-    printf("Done loading from file!\n");
+#if DEBUG_FILE_INPUT
+    0 printf("Done loading from file!\n");
     printf("num_verts: %d\tnum_tex: %d\n", num_vertices, num_tex_coords);
 #endif
 
@@ -1036,10 +1066,8 @@ int main(int argc, char **argv)
     glewInit();
 
     ctm = identity();
-    model_view = identity();
-    // Move model_view up slightly to simulate eye level
-    model_view = translate(0, -base_eye_level, 0);
-    projection = perspective(-0.2, 0.2, -0.1, 0.2, -1, -150);
+    model_view = look_at(eye, at, up);
+    projection = perspective(-0.2, 0.2, -0.1, 0.3, -1, -150);
 
     init();
     glutDisplayFunc(display);
