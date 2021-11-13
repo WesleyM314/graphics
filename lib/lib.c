@@ -137,6 +137,19 @@ vec4 crossVec(vec4 *v, vec4 *u)
 		0.0};
 }
 
+/**
+ * Return the angle between v and u
+ */
+GLfloat angleBetween(vec4 *v, vec4 *u)
+{
+	vec4 a, b;
+	a = *v;
+	b = *u;
+	a.w = 0;
+	b.w = 0;
+	return acosf(dotVec(&a, &b) / (magnitude(&a) * magnitude(&b)));
+}
+
 // MATRICES
 
 /**

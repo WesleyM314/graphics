@@ -281,12 +281,122 @@ void idle(void)
         // Look up
         if (lookup_flag)
         {
-            at.y += 0.005;
+            rx = identity();
+            ry = identity();
+            rz = identity();
+            // Calculate rotational axis as the cross
+            // product of [eye -> at] and [eye -> at + some y]
+            vec4 at_offset = v4(at.x, at.y + 0.005, at.z, at.w);
+            vec4 v1 = subVec(&at, &eye);
+            vec4 v2 = subVec(&at_offset, &eye);
+
+            vec4 axis = crossVec(&v1, &v2);
+            // vec4 axis = crossVec(&at, &at_offset);
+            axis = normalize(&axis);
+
+            // Calculate translation matrix to
+            // move fixed point (eye) to origin
+            mat4 t1 = translate(-eye.x, -eye.y, -eye.z);
+
+            // Rotate a small amount each time
+            rz = z_rotate(0.005);
+
+            // If angle less than threshold, don't rotate
+            // if angle hits 0, orientation is lost
+            if (angleBetween(&v1, &up) < 0.01)
+            {
+                rz = identity();
+            }
+
+            // Rotate axis to plane y = 0
+            GLfloat d = sqrtf(axis.y * axis.y + axis.z * axis.z);
+
+            if (d != 0)
+            {
+                rx.y = v4(0, axis.z / d, axis.y / d, 0);
+                rx.z = v4(0, -axis.y / d, axis.z / d, 0);
+            }
+
+            // Rotate axis to plane x = 0
+            ry.x = v4(d, 0, axis.x, 0);
+            ry.z = v4(-axis.x, 0, d, 0);
+
+            // Put together translation matrix
+            mat4 m = t1;
+            m = multMat(&rx, &m);
+            m = multMat(&ry, &m);
+            m = multMat(&rz, &m);
+            // Invert t1, rx, and ry
+            t1 = invMat(&t1);
+            rx = invMat(&rx);
+            ry = invMat(&ry);
+            // Continue making m
+            m = multMat(&ry, &m);
+            m = multMat(&rx, &m);
+            m = multMat(&t1, &m);
+
+            // Apply m to 'at'
+            at = multMatVec(&m, &at);
         }
         // Look down
         if (lookdown_flag)
         {
-            at.y -= 0.005;
+            rx = identity();
+            ry = identity();
+            rz = identity();
+            // Calculate rotational axis as the cross
+            // product of [eye -> at] and [eye -> at + some y]
+            vec4 at_offset = v4(at.x, at.y + 0.005, at.z, at.w);
+            vec4 v1 = subVec(&at, &eye);
+            vec4 v2 = subVec(&at_offset, &eye);
+
+            vec4 axis = crossVec(&v1, &v2);
+            // vec4 axis = crossVec(&at, &at_offset);
+            axis = normalize(&axis);
+
+            // Calculate translation matrix to
+            // move fixed point (eye) to origin
+            mat4 t1 = translate(-eye.x, -eye.y, -eye.z);
+
+            // Rotate a small amount each time
+            rz = z_rotate(-0.005);
+
+            // If looking almost straight down,
+            // don't rotate or orientation is lost
+            if (angleBetween(&v1, &up) >= M_PI - 0.01)
+            {
+                rz = identity();
+            }
+
+            // Rotate axis to plane y = 0
+            GLfloat d = sqrtf(axis.y * axis.y + axis.z * axis.z);
+
+            if (d != 0)
+            {
+                rx.y = v4(0, axis.z / d, axis.y / d, 0);
+                rx.z = v4(0, -axis.y / d, axis.z / d, 0);
+            }
+
+            // Rotate axis to plane x = 0
+            ry.x = v4(d, 0, axis.x, 0);
+            ry.z = v4(-axis.x, 0, d, 0);
+
+            // Put together translation matrix
+            mat4 m = t1;
+            m = multMat(&rx, &m);
+            m = multMat(&ry, &m);
+            m = multMat(&rz, &m);
+            // Invert t1, rx, and ry
+            t1 = invMat(&t1);
+            rx = invMat(&rx);
+            ry = invMat(&ry);
+            // Continue making m
+            m = multMat(&ry, &m);
+            m = multMat(&rx, &m);
+            m = multMat(&t1, &m);
+
+            // Apply m to 'at'
+            at = multMatVec(&m, &at);
         }
     }
 
