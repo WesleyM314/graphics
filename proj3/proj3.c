@@ -19,8 +19,9 @@
 
 #define BUFFER_OFFSET(offset) ((GLvoid *)(offset))
 #define DEBUG_FILE_INPUT 0
-#define MOVE_SPEED 0.02
-#define EYE_LEVEL 0.1 // y offset to simulate eye level
+#define MOVE_SPEED 10
+#define EYE_LEVEL 0.5 // y offset to simulate eye level
+#define GROUND_PADDING 0.2
 
 typedef enum
 {
@@ -125,73 +126,188 @@ void idle(void)
     // Animate to map mode
     if (to_map_flag == GL_TRUE)
     {
-        // Look down until camera_theta = -90
-        if (camera_theta > -M_PI / 2)
+        // Flag to know how long to keep looking down
+        GLboolean looking_down = GL_TRUE;
+        vec4 v1 = subVec(&at, &eye);
+
+        // If looking almost straight down,
+        // don't rotate or orientation is lost
+        // printf("Angle between: %f\n", angleBetween(&v1, &up));
+        if (angleBetween(&v1, &up) >= M_PI - 0.01)
         {
-            tr1 = x_rotate(0.01);
-            camera_theta -= 0.01;
-            m = multMat(&tr1, &m);
+            // printf("Looking down!\n");
+            rz = identity();
+            looking_down = GL_FALSE;
         }
-        // Move backward
+
+        if (looking_down == GL_TRUE)
+        {
+            // printf("Animating...\n");
+            rx = identity();
+            ry = identity();
+            rz = identity();
+            // Calculate rotational axis as the cross
+            // product of [eye -> at] and [eye -> at + some y]
+            vec4 at_offset = v4(at.x, at.y + 0.005, at.z, at.w);
+            vec4 v2 = subVec(&at_offset, &eye);
+
+            vec4 axis = crossVec(&v1, &v2);
+            // vec4 axis = crossVec(&at, &at_offset);
+            axis = normalize(&axis);
+
+            // Calculate translation matrix to
+            // move fixed point (eye) to origin
+            mat4 t1 = translate(-eye.x, -eye.y, -eye.z);
+
+            // Rotate a small amount each time
+            rz = z_rotate(-0.01);
+
+            // If looking almost straight down,
+            // don't rotate or orientation is lost
+            if (angleBetween(&v1, &up) >= M_PI - 0.01)
+            {
+                rz = identity();
+                looking_down == GL_FALSE;
+            }
+
+            // Rotate axis to plane y = 0
+            GLfloat d = sqrtf(axis.y * axis.y + axis.z * axis.z);
+
+            if (d != 0)
+            {
+                rx.y = v4(0, axis.z / d, axis.y / d, 0);
+                rx.z = v4(0, -axis.y / d, axis.z / d, 0);
+            }
+
+            // Rotate axis to plane x = 0
+            ry.x = v4(d, 0, axis.x, 0);
+            ry.z = v4(-axis.x, 0, d, 0);
+
+            // Put together translation matrix
+            mat4 m = t1;
+            m = multMat(&rx, &m);
+            m = multMat(&ry, &m);
+            m = multMat(&rz, &m);
+            // Invert t1, rx, and ry
+            t1 = invMat(&t1);
+            rx = invMat(&rx);
+            ry = invMat(&ry);
+            // Continue making m
+            m = multMat(&ry, &m);
+            m = multMat(&rx, &m);
+            m = multMat(&t1, &m);
+
+            // Apply m to 'at'
+            at = multMatVec(&m, &at);
+            model_view = look_at(eye, at, up);
+            // printVec(&at);
+            glutPostRedisplay();
+        }
         else
         {
-            // printf("TO MAP: done looking down\n");
-            // Move to 200 units above ground
-            if (anim_d < 50)
-            {
-                tr1 = translate(0, 0, -0.2);
-                anim_d += 0.2;
-                m = multMat(&tr1, &m);
-            }
-            else
-            {
-                // printf("TO MAP: done moving back\n");
+            // Move backwards up into the air until at a
+            // height of 100
+            eye.y += 0.5;
+            at.y += 0.5;
+            model_view = look_at(eye, at, up);
+            glutPostRedisplay();
+            if (eye.y >= 200)
                 to_map_flag = GL_FALSE;
-                printf("camera_theta: %f\n", camera_theta);
-                printf("anim_d: %f\n", anim_d);
-            }
         }
-        // Redraw and return to ensure
-        // no movement while animating
-        model_view = multMat(&m, &model_view);
-        glutPostRedisplay();
-        return;
     }
 
     // Animate to walk mode
     if (from_map_flag == GL_TRUE)
     {
-        // TODO move in to ground
-        if (anim_d > base_eye_level)
+        // Move towards ground
+        if (eye.y > EYE_LEVEL + 0.01)
         {
-            tr1 = translate(0, 0, 0.2);
-            anim_d -= 0.2;
-            m = multMat(&tr1, &m);
+            // printf("Moving in...\n");
+            eye.y -= 0.5;
+            at.y -= 0.5;
+            model_view = look_at(eye, at, up);
+            glutPostRedisplay();
         }
-        // Look up until camera_theta = 0
         else
         {
-            if (camera_theta < 0)
+            // Make sure eye is at exactly eye level
+            eye.y = EYE_LEVEL;
+            // look up until looking straight ahead
+            if (at.y < eye.y)
             {
-                tr1 = x_rotate(-0.01);
-                camera_theta += 0.01;
-                m = multMat(&tr1, &m);
+                // printf("Looking up...\n");
+                rx = identity();
+                ry = identity();
+                rz = identity();
+                // Calculate rotational axis as the cross
+                // product of [eye -> at] and [eye -> at + some y]
+                vec4 at_offset = v4(at.x, at.y + 0.005, at.z, at.w);
+                vec4 v1 = subVec(&at, &eye);
+                vec4 v2 = subVec(&at_offset, &eye);
+
+                vec4 axis = crossVec(&v1, &v2);
+                // vec4 axis = crossVec(&at, &at_offset);
+                axis = normalize(&axis);
+
+                // Calculate translation matrix to
+                // move fixed point (eye) to origin
+                mat4 t1 = translate(-eye.x, -eye.y, -eye.z);
+
+                // Rotate a small amount each time
+                rz = z_rotate(0.01);
+
+                // If angle less than threshold, don't rotate
+                // if angle hits 0, orientation is lost
+                if (angleBetween(&v1, &up) < 0.01)
+                {
+                    rz = identity();
+                }
+
+                // Rotate axis to plane y = 0
+                GLfloat d = sqrtf(axis.y * axis.y + axis.z * axis.z);
+
+                if (d != 0)
+                {
+                    rx.y = v4(0, axis.z / d, axis.y / d, 0);
+                    rx.z = v4(0, -axis.y / d, axis.z / d, 0);
+                }
+
+                // Rotate axis to plane x = 0
+                ry.x = v4(d, 0, axis.x, 0);
+                ry.z = v4(-axis.x, 0, d, 0);
+
+                // Put together translation matrix
+                mat4 m = t1;
+                m = multMat(&rx, &m);
+                m = multMat(&ry, &m);
+                m = multMat(&rz, &m);
+                // Invert t1, rx, and ry
+                t1 = invMat(&t1);
+                rx = invMat(&rx);
+                ry = invMat(&ry);
+                // Continue making m
+                m = multMat(&ry, &m);
+                m = multMat(&rx, &m);
+                m = multMat(&t1, &m);
+
+                // Apply m to 'at'
+                at = multMatVec(&m, &at);
+                model_view = look_at(eye, at, up);
+                glutPostRedisplay();
             }
             else
             {
-                // When animation done, return
-                // movement control
-                curMode = WALK;
+                // printf("Looking forward!\n");
+                // Make sure at and eye on same level
+                at.y = eye.y;
+                // Stop animation
                 from_map_flag = GL_FALSE;
-                printf("camera_theta: %f\n", camera_theta);
-                printf("anim_d: %f\n", anim_d);
+                // Change mode to allow movement
+                curMode = WALK;
+                model_view = look_at(eye, at, up);
+                glutPostRedisplay();
             }
         }
-        // Redraw and return to ensure
-        // no movement while animating
-        model_view = multMat(&m, &model_view);
-        glutPostRedisplay();
-        return;
     }
 
     // Handle movement
@@ -211,10 +327,10 @@ void idle(void)
             diff = normalize(&diff);
             // Translate both eye and at in diff direction
             // Do NOT translate in y direction
-            eye.x += diff.x / 100;
-            eye.z += diff.z / 100;
-            at.x += diff.x / 100;
-            at.z += diff.z / 100;
+            eye.x += diff.x / 10;
+            eye.z += diff.z / 10;
+            at.x += diff.x / 10;
+            at.z += diff.z / 10;
         }
         // Back
         if (back_flag)
@@ -225,10 +341,10 @@ void idle(void)
             diff = normalize(&diff);
             // Translate both eye and at in diff direction
             // Do NOT translate in y direction
-            eye.x -= diff.x / 100;
-            eye.z -= diff.z / 100;
-            at.x -= diff.x / 100;
-            at.z -= diff.z / 100;
+            eye.x -= diff.x / 10;
+            eye.z -= diff.z / 10;
+            at.x -= diff.x / 10;
+            at.z -= diff.z / 10;
         }
         // Left
         if (left_flag)
@@ -237,10 +353,10 @@ void idle(void)
             vec4 z_prime = subVec(&eye, &at);
             vec4 x_prime = crossVec(&up, &z_prime);
 
-            eye.x -= x_prime.x / 100;
-            eye.z -= x_prime.z / 100;
-            at.x -= x_prime.x / 100;
-            at.z -= x_prime.z / 100;
+            eye.x -= x_prime.x / 10;
+            eye.z -= x_prime.z / 10;
+            at.x -= x_prime.x / 10;
+            at.z -= x_prime.z / 10;
         }
         // Right
         if (right_flag)
@@ -249,10 +365,10 @@ void idle(void)
             vec4 z_prime = subVec(&eye, &at);
             vec4 x_prime = crossVec(&up, &z_prime);
 
-            eye.x += x_prime.x / 100;
-            eye.z += x_prime.z / 100;
-            at.x += x_prime.x / 100;
-            at.z += x_prime.z / 100;
+            eye.x += x_prime.x / 10;
+            eye.z += x_prime.z / 10;
+            at.x += x_prime.x / 10;
+            at.z += x_prime.z / 10;
         }
         // Turn left
         if (turnleft_flag)
@@ -621,10 +737,15 @@ void display(void)
 
     // Draw city
     glUniform1i(colorflag_location, 0);
-    glDrawArrays(GL_TRIANGLES, 0, num_vertices - 6);
+    glDrawArrays(GL_TRIANGLES, 0, num_vertices - 9);
     // Draw ground
     glUniform1i(colorflag_location, 1);
-    glDrawArrays(GL_TRIANGLES, num_vertices - 6, 6);
+    glDrawArrays(GL_TRIANGLES, num_vertices - 9, 6);
+    // If in map mode, draw triangle
+    if(curMode == MAP)
+    {
+        glDrawArrays(GL_TRIANGLES, num_vertices - 3, 3);
+    }
 
     glutSwapBuffers();
 }
@@ -839,6 +960,28 @@ void keyboard(unsigned char key, int mousex, int mousey)
     // Animate to map mode
     if (key == 'm')
     {
+        // Calculate x and z coords for 
+        // triangle vertices
+        vertices[num_vertices - 3].x = eye.x;
+        vertices[num_vertices - 3].z = eye.z;
+
+        vec4 back = subVec(&eye, &at);
+        back = normalize(&back);
+        back = multScalVec(&back, 5.0);
+        mat4 tr = translate(back.x, back.y, back.z);
+        // Project other two vertices behind eye in line
+        // with at, then move to either size perpendicularly
+        vertices[num_vertices - 2] = multMatVec(&tr, &vertices[num_vertices - 2]);
+        vertices[num_vertices - 1] = multMatVec(&tr, &vertices[num_vertices - 1]);
+        // Get vector for other direction by crossing back with up
+        vec4 side = crossVec(&up, &back);
+        side = normalize(&side);
+        side = multScalVec(&side, 1.0);
+        tr = translate(-side.x, -side.y, -side.z);
+        vertices[num_vertices - 2] = multMatVec(&tr, &vertices[num_vertices - 2]);
+        tr = translate(side.x, side.y, side.z);
+        vertices[num_vertices - 1] = multMatVec(&tr, &vertices[num_vertices - 1]);
+
         curMode = MAP;
         from_map_flag = GL_FALSE;
         to_map_flag = GL_TRUE;
@@ -1112,18 +1255,23 @@ void readFile()
 
 #endif
     // Add ground
-    v4ListPush(&vertOrdered, v4(minx, 0, maxz, 1));
-    v4ListPush(&vertOrdered, v4(maxx, 0, maxz, 1));
-    v4ListPush(&vertOrdered, v4(maxx, 0, minz, 1));
+    v4ListPush(&vertOrdered, v4(minx - GROUND_PADDING, 0, maxz + GROUND_PADDING, 1));
+    v4ListPush(&vertOrdered, v4(maxx + GROUND_PADDING, 0, maxz + GROUND_PADDING, 1));
+    v4ListPush(&vertOrdered, v4(maxx + GROUND_PADDING, 0, minz - GROUND_PADDING, 1));
 
-    v4ListPush(&vertOrdered, v4(maxx, 0, minz, 1));
-    v4ListPush(&vertOrdered, v4(minx, 0, minz, 1));
-    v4ListPush(&vertOrdered, v4(minx, 0, maxz, 1));
+    v4ListPush(&vertOrdered, v4(maxx + GROUND_PADDING, 0, minz - GROUND_PADDING, 1));
+    v4ListPush(&vertOrdered, v4(minx - GROUND_PADDING, 0, minz - GROUND_PADDING, 1));
+    v4ListPush(&vertOrdered, v4(minx - GROUND_PADDING, 0, maxz + GROUND_PADDING, 1));
+
+    // Add triangle - start with dummy values
+    v4ListPush(&vertOrdered, v4(0, 0.01, 0, 1));
+    v4ListPush(&vertOrdered, v4(0.01, 0.01, 0, 1));
+    v4ListPush(&vertOrdered, v4(0.005, 0.01, -0.005, 1));
 
     // Translate so all x >= 0, y >= 0, z <= 0
     mat4 m1 = translate(-minx, -miny, -maxz);
     // Scale by 100
-    mat4 m2 = scale(10, 10, 10);
+    mat4 m2 = scale(100, 100, 100);
     mat4 m3 = multMat(&m2, &m1);
     for (int i = 0; i < vertOrdered.length; i++)
     {
@@ -1136,19 +1284,17 @@ void readFile()
     tex_coords = texOrdered.items;
     num_tex_coords += texOrdered.length;
 
-    // TODO ask if this can be optimized
-    // Fill colors with last 6 entries being green for ground
-    num_colors = num_vertices - 6;
+    // Fill colors with green for ground, blue for triangle
+    num_colors = num_vertices;
     colors = (vec4 *)malloc(sizeof(vec4) * num_colors);
-    for (int i = 0; i < num_colors; i++)
+    for (int i = 0; i < num_colors - 3; i++)
     {
-        colors[i] = v4(1, 1, 1, 1);
+        colors[i] = v4(0.11, 0.647, 0.188, 1);
     }
-
-    for (int i = 0; i < 6; i++)
-    {
-        colors[num_colors++] = v4(0.11, 0.647, 0.188, 1);
-    }
+    // Make last three colors blue
+    colors[num_colors - 3] = v4(0,0,1,1);
+    colors[num_colors - 2] = v4(0,0,1,1);
+    colors[num_colors - 1] = v4(0,0,1,1);
 
 #if DEBUG_FILE_INPUT
     0 printf("Done loading from file!\n");
@@ -1177,7 +1323,7 @@ int main(int argc, char **argv)
 
     ctm = identity();
     model_view = look_at(eye, at, up);
-    projection = perspective(-0.2, 0.2, -0.1, 0.3, -1, -150);
+    projection = perspective(-0.2, 0.2, -0.1, 0.3, -1, -210);
 
     init();
     glutDisplayFunc(display);
