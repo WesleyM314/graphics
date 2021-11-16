@@ -9,10 +9,20 @@ varying vec4 color;
 uniform mat4 ctm;
 uniform mat4 model_view;
 uniform mat4 projection;
+uniform int draw_arrow;
+uniform mat4 arrow_tr;
 
 void main()
 {
 	texCoord = vTexCoord;
 	color = vColor;
-	gl_Position = projection * model_view * vPosition;
+	if(draw_arrow == 0)
+	{
+		gl_Position = projection * model_view * vPosition;
+	}
+	else
+	{
+		// Translate points by arrow_tr mat
+		gl_Position = projection * model_view * arrow_tr * vPosition;
+	}
 }
