@@ -25,12 +25,20 @@
 #define EYE_LEVEL 1.01 // y offset to simulate eye level
 #define GROUND_PADDING 0.2
 
+// Available modes
 typedef enum
 {
     MAP,
     WALK
 } mode;
 
+// Pipeline transformation matrices
+mat4 ctm;
+mat4 model_view;
+mat4 projection;
+mat4 arrow_tr;
+
+// Memory locations of pipeline values
 GLuint ctm_location;
 GLuint model_view_location;
 GLuint projection_location;
@@ -38,21 +46,21 @@ GLuint colorflag_location;
 GLuint draw_arrow_location;
 GLuint arrow_tr_location;
 
+// Arrays for vertices and colors
 vec4 *vertices;
 vec4 *colors;
 vec2 *tex_coords;
 
+// Keep track of vertex quantities 
 int num_vertices = 0;
 int num_colors = 0;
 int num_tex_coords = 0;
-GLboolean idle_spin = GL_FALSE;
-GLboolean has_colors = GL_FALSE;
-int texw, texh;
 
-mat4 ctm;
-mat4 model_view;
-mat4 projection;
-mat4 arrow_tr;
+// Flag for file including colors
+GLboolean has_colors = GL_FALSE;
+
+// Texture dimensions
+int texw, texh;
 
 // Perspective projection variables
 GLfloat left, right, top, bottom, near, far;
@@ -84,16 +92,14 @@ GLboolean lookdown_flag = GL_FALSE;
 // Flags for animations
 GLboolean to_map_flag = GL_FALSE;
 GLboolean from_map_flag = GL_FALSE;
-// Values to help animation
+
+// Distance from "ground" used in animation
 GLfloat anim_d = 0;
 
 // Keep track of up/down camera angle
 GLfloat camera_theta = 0;
 
-// Variables for mouse movements/dragging
-vec4 cur_point = (vec4){0, 0, 0, 1};
-vec4 prev_point = (vec4){0, 0, 0, 1};
-vec4 rotate_axis = (vec4){0, 0, 0, 1};
+// Used in animation calculations
 mat4 rx = {
     {1, 0, 0, 0},
     {0, 1, 0, 0},
@@ -107,12 +113,6 @@ mat4 ry = {
     {0, 0, 0, 1},
 };
 mat4 rz = {
-    {1, 0, 0, 0},
-    {0, 1, 0, 0},
-    {0, 0, 1, 0},
-    {0, 0, 0, 1},
-};
-mat4 rotate_mat = {
     {1, 0, 0, 0},
     {0, 1, 0, 0},
     {0, 0, 1, 0},
@@ -520,110 +520,6 @@ void idle(void)
     glutPostRedisplay();
 }
 
-/**
- * Create unit sphere
- * Mostly for testing
- */
-void unitSphere(void)
-{
-    GLfloat theta;
-    mat4 r;
-    GLint numSegments = 40, numRings = 40;
-
-    // Allocate space for vertices
-    int numVerts = ((numRings)*6) * numSegments;
-    vertices = (vec4 *)malloc(sizeof(vec4) * numVerts);
-
-    // Form reference edges of segment
-    vec4 *ref1 = (vec4 *)malloc(sizeof(vec4) * (numRings + 1));
-    vec4 *ref2 = (vec4 *)malloc(sizeof(vec4) * (numRings + 1));
-    theta = M_PI / numRings;
-    r = z_rotate(-theta);
-    ref1[0] = v4(0, 1, 0, 1);
-    for (int i = 1; i <= numRings; i++)
-    {
-        ref1[i] = multMatVec(&r, &ref1[i - 1]);
-    }
-
-    // Copy ref1 to ref2 and rotate about y axis
-    theta = 2 * M_PI / numSegments;
-    r = y_rotate(theta);
-    for (int i = 0; i <= numRings; i++)
-    {
-        ref2[i] = multMatVec(&r, &ref1[i]);
-    }
-
-    // Rotate ref segment about y axis, adding triangles
-    for (int i = 0; i < numSegments; i++)
-    {
-        for (int j = 0; j <= numRings; j++)
-        {
-            // Top sphere cap - single triangle
-            if (j == 0)
-            {
-                vertices[num_vertices++] = ref1[0];
-                vertices[num_vertices++] = ref1[1];
-                vertices[num_vertices++] = ref2[1];
-            }
-            // Bottom sphere cap
-            else if (j == numRings)
-            {
-                vertices[num_vertices++] = ref1[j - 1];
-                vertices[num_vertices++] = ref1[j];
-                vertices[num_vertices++] = ref2[j - 1];
-            }
-            else
-            {
-                vertices[num_vertices++] = ref1[j];
-                vertices[num_vertices++] = ref1[j + 1];
-                vertices[num_vertices++] = ref2[j];
-
-                vertices[num_vertices++] = ref1[j + 1];
-                vertices[num_vertices++] = ref2[j + 1];
-                vertices[num_vertices++] = ref2[j];
-            }
-        }
-
-        // Rotate ref1 and ref2 about y axis
-        for (int j = 0; j <= numRings; j++)
-        {
-            ref1[j] = multMatVec(&r, &ref1[j]);
-            ref2[j] = multMatVec(&r, &ref1[j]);
-        }
-    }
-}
-
-/**
- * Creates a random color for every triangle currently
- * in the vertices array
- */
-void randColors(void)
-{
-    // Red, green, blue
-    GLfloat r, g, b;
-
-    // Allocate memory for color vectors
-    colors = (vec4 *)malloc(sizeof(vec4) * num_vertices);
-
-    // Seed random number generator
-    srand((unsigned)time(NULL));
-
-    // Loop through triangles
-    GLint num = num_vertices / 3;
-    for (int i = 0; i < num; i++)
-    {
-        // Get random values, scaling to range [0..1]
-        r = (GLfloat)rand() / (GLfloat)RAND_MAX;
-        b = (GLfloat)rand() / (GLfloat)RAND_MAX;
-        g = (GLfloat)rand() / (GLfloat)RAND_MAX;
-
-        // Add to color array 3 times to color whole triangle
-        colors[num_colors++] = (vec4){r, g, b, 1.0};
-        colors[num_colors++] = (vec4){r, g, b, 1.0};
-        colors[num_colors++] = (vec4){r, g, b, 1.0};
-    }
-}
-
 void init(void)
 {
 
@@ -758,185 +654,6 @@ void display(void)
     glutSwapBuffers();
 }
 
-void mouse(int button, int state, int x, int y)
-{
-    if (button == GLUT_LEFT_BUTTON)
-    {
-        if (state == GLUT_DOWN)
-        {
-            // On left button click, set cur_point
-            // prev_point doesn't matter
-            setCurPoint(x, y);
-            // Stop rotation
-            rotate_mat = identity();
-            idle_spin = GL_FALSE;
-        }
-        else if (state == GLUT_UP)
-        {
-            idle_spin = GL_TRUE;
-        }
-    }
-    if (button == 3)
-    {
-        // Zoom in
-        mat4 s = scale(1.02, 1.02, 1.02);
-        ctm = multMat(&s, &ctm);
-        glutPostRedisplay();
-    }
-    if (button == 4)
-    {
-        // Zoom out
-        mat4 s = scale(1 / 1.02, 1 / 1.02, 1 / 1.02);
-        ctm = multMat(&s, &ctm);
-        glutPostRedisplay();
-    }
-}
-
-void setCurPoint(int x, int y)
-{
-    // Calculate current point vector
-    // Convert x and y to OpenGL coordinates
-    GLfloat gl_x, gl_y, gl_z, temp;
-    gl_x = ((GLfloat)x - ((GLfloat)WSIZE / 2.0)) / ((GLfloat)WSIZE / 2.0);
-    gl_y = -((GLfloat)y - ((GLfloat)WSIZE / 2.0)) / ((GLfloat)WSIZE / 2.0);
-
-    // Calculate z coordinate assuming our "glass ball" is a unit sphere
-    temp = 1.0 - (gl_x * gl_x + gl_y * gl_y);
-
-    if (temp < 0)
-    {
-        // If temp is < 0, the mouse is off the
-        // "glass ball" and z needs to be set
-        // to 0 manually (at least that's how I'm
-        // choosing to handle it).
-        gl_z = 0;
-    }
-    else
-    {
-        gl_z = sqrt(temp);
-    }
-
-    // Set cur_point
-    cur_point = v4(gl_x, gl_y, gl_z, 1.0);
-}
-
-void motion(int x, int y)
-{
-    // Move cur_point to prev_point
-    prev_point = cur_point;
-
-    // Set cur_point
-    setCurPoint(x, y);
-
-    // return if cur_point and prev_point are the same
-    // to avoid NaN errors
-    if (equalVecs(&cur_point, &prev_point))
-    {
-        return;
-    }
-
-    // Calculate angle between prev_point and cur_point
-    // Not sure why, but it seems I need to multiply by
-    // 1.5 to have the unit sphere move more closely
-    // with the mouse cursor
-    GLfloat theta = 1.5 * acosf(dotVec(&prev_point, &cur_point) / (magnitude(&prev_point) * magnitude(&cur_point)));
-
-    // Object will be rotated about z by theta degrees
-    rz = z_rotate(theta);
-
-    // Calculate rotational axis using cross product
-    // of cur_point and prev_point
-    rotate_axis = crossVec(&prev_point, &cur_point);
-
-    // If rotation axis is zero vector (like when moving on a
-    // diagonal off the edges of the "glass ball") just return
-    if (!rotate_axis.x && !rotate_axis.y && !rotate_axis.z)
-    {
-        return;
-    }
-
-    // Normalize rotate_axis
-    rotate_axis = normalize(&rotate_axis);
-
-    // Use origin as fixed point
-    // Rotate axis to plane y = 0
-    GLfloat d = sqrtf(rotate_axis.y * rotate_axis.y + rotate_axis.z * rotate_axis.z);
-
-    if (d != 0)
-    {
-        rx.y = (vec4){0, rotate_axis.z / d, rotate_axis.y / d, 0};
-        rx.z = (vec4){0, -rotate_axis.y / d, rotate_axis.z / d, 0};
-    }
-
-    // Rotate axis to plane x = 0
-    ry.x = (vec4){d, 0, rotate_axis.x, 0};
-    ry.z = (vec4){-rotate_axis.x, 0, d, 0};
-
-    // Get final transformation matrix
-    rotate_mat = multMat(&ry, &rx);
-    rotate_mat = multMat(&rz, &rotate_mat);
-    // Transpose rx and ry
-    rx = transpose(&rx);
-    ry = transpose(&ry);
-    rotate_mat = multMat(&ry, &rotate_mat);
-    rotate_mat = multMat(&rx, &rotate_mat);
-
-    // Update ctm
-    ctm = multMat(&rotate_mat, &ctm);
-    glutPostRedisplay();
-}
-
-/**
- * Center object and scale to fit in 
- * field of view
- */
-void centerScale()
-{
-    // Find bounds of points
-    GLfloat minx = 0, maxx = 0, miny = 0, maxy = 0, minz = 0, maxz = 0;
-    for (int i = 0; i < num_vertices; i++)
-    {
-        minx = vertices[i].x < minx ? vertices[i].x : minx;
-        maxx = vertices[i].x > maxx ? vertices[i].x : maxx;
-
-        miny = vertices[i].y < miny ? vertices[i].y : miny;
-        maxy = vertices[i].y > maxy ? vertices[i].y : maxy;
-
-        minz = vertices[i].z < minz ? vertices[i].z : minz;
-        maxz = vertices[i].z > maxz ? vertices[i].z : maxz;
-    }
-
-    // Center point
-    vec4 center = v4((maxx + minx) / 2, (maxy + miny) / 2, (maxz + minz) / 2, 1);
-
-    // Find largest range, use that to scale
-    GLfloat scaleFactor;
-
-    GLfloat xrange, yrange, zrange;
-    xrange = abs(maxx - minx);
-    yrange = abs(maxy - miny);
-    zrange = abs(maxz - minz);
-
-    scaleFactor = xrange;
-    if (yrange > scaleFactor)
-        scaleFactor = yrange;
-    if (zrange > scaleFactor)
-        scaleFactor = zrange;
-
-    scaleFactor = 2 / scaleFactor;
-
-    // Translate so midpoint == origin, then scale
-    mat4 t = translate(-center.x, -center.y, -center.z);
-    mat4 s = scale(scaleFactor, scaleFactor, scaleFactor);
-    mat4 tr = multMat(&s, &t);
-
-    // Translate and scale all vertices
-    for (int i = 0; i < num_vertices; i++)
-    {
-        vertices[i] = multMatVec(&tr, &vertices[i]);
-    }
-}
-
 void keyboard(unsigned char key, int mousex, int mousey)
 {
     // Quit
@@ -946,8 +663,6 @@ void keyboard(unsigned char key, int mousex, int mousey)
     if (key == 'r')
     {
         ctm = identity();
-        // model_view = translate(0, -base_eye_level, 0);
-        // rotate_mat = identity();
         anim_d = base_eye_level;
         camera_theta = 0;
         eye = v4(0, EYE_LEVEL, 0, 1);
@@ -1322,8 +1037,32 @@ void readFile()
     free(texTemp.items);
 }
 
+void printControls()
+{
+    printf("\nWelcome!\n\n");
+    printf("CONTROLS\n");
+    printf("------------------------------------------------\n");
+    printf("Up Arrow: Walk Forward\n");
+    printf("Down Arrow: Walk Backward\n");
+    printf("Left Arrow: Turn Left\n");
+    printf("Right Arrow: Turn Right\n");
+    printf("J: Walk Left\n");
+    printf("L: Walk Right\n");
+    printf("M: Enter Map Mode\n");
+    printf("E: Enter Walking Mode\n");
+    printf("Page Up: Look Up\n");
+    printf("Page Down: Look Down\n");
+    printf("R: Reset\n");
+    printf("Q: Quit\n");
+
+    printf("\n\n");
+}
+
 int main(int argc, char **argv)
 {
+    // TODO print key commands on launch
+    printControls();
+    // TODO Remove unneeded code
     texw = 1024;
     texh = 1024;
     has_colors = GL_FALSE;
@@ -1339,7 +1078,7 @@ int main(int argc, char **argv)
 
     ctm = identity();
     model_view = look_at(eye, at, up);
-    projection = perspective(-0.2, 0.2, -0.1, 0.3, -1, -210);
+    projection = perspective(-0.3, 0.3, -0.1, 0.3, -1, -210);
 
     init();
     glutDisplayFunc(display);
@@ -1347,9 +1086,6 @@ int main(int argc, char **argv)
     glutKeyboardUpFunc(keyboardUp);
     glutSpecialFunc(keySpecial);
     glutSpecialUpFunc(keySpecialUp);
-    glutMouseFunc(mouse);
-    glutMotionFunc(motion);
-    // glutReshapeFunc(reshape);
     glutIdleFunc(idle);
     glutMainLoop();
 
