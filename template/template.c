@@ -17,22 +17,27 @@
 #include "template.h"
 
 #define BUFFER_OFFSET(offset) ((GLvoid *)(offset))
+#define DEBUG 0
 
 GLuint ctm_location;
 
 vec4 *vertices;
 vec4 *colors;
+vec2 *tex_coords;
 
 int num_vertices = 0;
 int num_colors = 0;
-GLboolean idleSpin = GL_FALSE;
+int num_tex_coords = 0;
+GLboolean idle_spin = GL_FALSE;
+GLboolean has_colors = GL_FALSE;
+int texw, texh;
 
 mat4 ctm;
 
 // Variables for mouse movements/dragging
-vec4 curPoint = (vec4){0, 0, 0, 1};
-vec4 prevPoint = (vec4){0, 0, 0, 1};
-vec4 rotateAxis = (vec4){0, 0, 0, 1};
+vec4 cur_point = (vec4){0, 0, 0, 1};
+vec4 prev_point = (vec4){0, 0, 0, 1};
+vec4 rotate_axis = (vec4){0, 0, 0, 1};
 mat4 rx = {
     {1, 0, 0, 0},
     {0, 1, 0, 0},
@@ -51,7 +56,7 @@ mat4 rz = {
     {0, 0, 1, 0},
     {0, 0, 0, 1},
 };
-mat4 rotateMat = {
+mat4 rotate_mat = {
     {1, 0, 0, 0},
     {0, 1, 0, 0},
     {0, 0, 1, 0},
@@ -63,9 +68,9 @@ mat4 rotateMat = {
  */
 void idle(void)
 {
-    if (idleSpin)
+    if (idle_spin)
     {
-        ctm = multMat(&rotateMat, &ctm);
+        ctm = multMat(&rotate_mat, &ctm);
         glutPostRedisplay();
     }
 }
@@ -176,8 +181,50 @@ void randColors(void)
 
 void init(void)
 {
+
+    // Load texture data
+    GLubyte my_texels[texw][texh][3];
+
+    // TODO
+    // Load texture from file
+    char *fn = (char *)malloc(sizeof(char) * 25);
+    fn = "filename_here";
+    FILE *f = fopen(fn, "r");
+    if (f == NULL)
+    {
+        printf("Error: couldn't open file %s\n", fn);
+        exit(0);
+    }
+    fread(my_texels, texw * texh * 3, 1, f);
+    fclose(f);
+
     GLuint program = initShader("vshader.glsl", "fshader.glsl");
     glUseProgram(program);
+
+    if (has_colors)
+    {
+        glUniform1i(glGetUniformLocation(program, "use_color"), 1);
+    }
+    else
+    {
+        glUniform1i(glGetUniformLocation(program, "use_color"), 0);
+    }
+
+    // More texture stuff
+    if (!has_colors)
+    {
+        GLuint mytex[1];
+        glGenTextures(1, mytex);
+        glBindTexture(GL_TEXTURE_2D, mytex[0]);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, texw, texh, 0, GL_RGB, GL_UNSIGNED_BYTE, my_texels);
+        glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+        glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+        glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+
+        int param;
+        glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_WIDTH, &param);
+    }
 
     GLuint vao;
     glGenVertexArrays(1, &vao);
@@ -186,9 +233,10 @@ void init(void)
     GLuint buffer;
     glGenBuffers(1, &buffer);
     glBindBuffer(GL_ARRAY_BUFFER, buffer);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vec4) * num_vertices + sizeof(vec4) * num_colors, NULL, GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(vec4) * num_vertices + sizeof(vec4) * num_colors + sizeof(vec2) * num_tex_coords, NULL, GL_STATIC_DRAW);
     glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(vec4) * num_vertices, vertices);
     glBufferSubData(GL_ARRAY_BUFFER, sizeof(vec4) * num_vertices, sizeof(vec4) * num_colors, colors);
+    glBufferSubData(GL_ARRAY_BUFFER, sizeof(vec4) * num_vertices + sizeof(vec4) * num_colors, sizeof(vec2) * num_tex_coords, tex_coords);
 
     GLuint vPosition = glGetAttribLocation(program, "vPosition");
     glEnableVertexAttribArray(vPosition);
@@ -198,9 +246,22 @@ void init(void)
     glEnableVertexAttribArray(vColor);
     glVertexAttribPointer(vColor, 4, GL_FLOAT, GL_FALSE, 0, (GLvoid *)(sizeof(vec4) * num_vertices));
 
+    // Texture stuff
+    if (!has_colors)
+    {
+        GLuint vTexCoord = glGetAttribLocation(program, "vTexCoord");
+        glEnableVertexAttribArray(vTexCoord);
+        glVertexAttribPointer(vTexCoord, 2, GL_FLOAT, GL_FALSE, 0, (GLvoid *)(sizeof(vec4) * num_vertices + sizeof(vec4) * num_colors));
+        // Locate texture
+        GLuint texture_location = glGetUniformLocation(program, "texture");
+        glUniform1i(texture_location, 0);
+        printf("texture_location: %i\n", texture_location);
+    }
+
     // Locate CTM
     ctm_location = glGetUniformLocation(program, "ctm");
 
+    glEnable(GL_CULL_FACE);
     glEnable(GL_DEPTH_TEST);
     glClearColor(0.0, 0.0, 0.0, 1.0);
     glDepthRange(1, 0);
@@ -226,16 +287,16 @@ void mouse(int button, int state, int x, int y)
     {
         if (state == GLUT_DOWN)
         {
-            // On left button click, set curPoint
-            // prevPoint doesn't matter
+            // On left button click, set cur_point
+            // prev_point doesn't matter
             setCurPoint(x, y);
             // Stop rotation
-            rotateMat = identity();
-            idleSpin = GL_FALSE;
+            rotate_mat = identity();
+            idle_spin = GL_FALSE;
         }
         else if (state == GLUT_UP)
         {
-            idleSpin = GL_TRUE;
+            idle_spin = GL_TRUE;
         }
     }
     if (button == 3)
@@ -278,74 +339,125 @@ void setCurPoint(int x, int y)
         gl_z = sqrt(temp);
     }
 
-    // Set curPoint
-    curPoint = v4(gl_x, gl_y, gl_z, 1.0);
+    // Set cur_point
+    cur_point = v4(gl_x, gl_y, gl_z, 1.0);
 }
 
 void motion(int x, int y)
 {
-    // Move curPoint to prevPoint
-    prevPoint = curPoint;
+    // Move cur_point to prev_point
+    prev_point = cur_point;
 
-    // Set curPoint
+    // Set cur_point
     setCurPoint(x, y);
 
-    // return if curPoint and prevPoint are the same
+    // return if cur_point and prev_point are the same
     // to avoid NaN errors
-    if (equalVecs(&curPoint, &prevPoint))
+    if (equalVecs(&cur_point, &prev_point))
     {
         return;
     }
 
-    // Calculate angle between prevPoint and curPoint
+    // Calculate angle between prev_point and cur_point
     // Not sure why, but it seems I need to multiply by
     // 1.5 to have the unit sphere move more closely
     // with the mouse cursor
-    GLfloat theta = 1.5 * acosf(dotVec(&prevPoint, &curPoint) / (magnitude(&prevPoint) * magnitude(&curPoint)));
+    GLfloat theta = 1.5 * acosf(dotVec(&prev_point, &cur_point) / (magnitude(&prev_point) * magnitude(&cur_point)));
 
     // Object will be rotated about z by theta degrees
     rz = z_rotate(theta);
 
     // Calculate rotational axis using cross product
-    // of curPoint and prevPoint
-    rotateAxis = crossVec(&prevPoint, &curPoint);
+    // of cur_point and prev_point
+    rotate_axis = crossVec(&prev_point, &cur_point);
 
     // If rotation axis is zero vector (like when moving on a
     // diagonal off the edges of the "glass ball") just return
-    if (!rotateAxis.x && !rotateAxis.y && !rotateAxis.z)
+    if (!rotate_axis.x && !rotate_axis.y && !rotate_axis.z)
     {
         return;
     }
 
-    // Normalize rotateAxis
-    rotateAxis = normalize(&rotateAxis);
+    // Normalize rotate_axis
+    rotate_axis = normalize(&rotate_axis);
 
     // Use origin as fixed point
     // Rotate axis to plane y = 0
-    GLfloat d = sqrtf(rotateAxis.y * rotateAxis.y + rotateAxis.z * rotateAxis.z);
+    GLfloat d = sqrtf(rotate_axis.y * rotate_axis.y + rotate_axis.z * rotate_axis.z);
 
     if (d != 0)
     {
-        rx.y = (vec4){0, rotateAxis.z / d, rotateAxis.y / d, 0};
-        rx.z = (vec4){0, -rotateAxis.y / d, rotateAxis.z / d, 0};
+        rx.y = (vec4){0, rotate_axis.z / d, rotate_axis.y / d, 0};
+        rx.z = (vec4){0, -rotate_axis.y / d, rotate_axis.z / d, 0};
     }
 
     // Rotate axis to plane x = 0
-    ry.x = (vec4){d, 0, rotateAxis.x, 0};
-    ry.z = (vec4){-rotateAxis.x, 0, d, 0};
+    ry.x = (vec4){d, 0, rotate_axis.x, 0};
+    ry.z = (vec4){-rotate_axis.x, 0, d, 0};
 
     // Get final transformation matrix
-    rotateMat = multMat(&ry, &rx);
-    rotateMat = multMat(&rz, &rotateMat);
+    rotate_mat = multMat(&ry, &rx);
+    rotate_mat = multMat(&rz, &rotate_mat);
     // Transpose rx and ry
     rx = transpose(&rx);
     ry = transpose(&ry);
-    rotateMat = multMat(&ry, &rotateMat);
-    rotateMat = multMat(&rx, &rotateMat);
+    rotate_mat = multMat(&ry, &rotate_mat);
+    rotate_mat = multMat(&rx, &rotate_mat);
 
     // Update ctm
-    ctm = multMat(&rotateMat, &ctm);
+    ctm = multMat(&rotate_mat, &ctm);
     glutPostRedisplay();
+}
+
+/**
+ * Center object and scale to fit in 
+ * field of view
+ */
+void centerScale()
+{
+    // Find bounds of points
+    GLfloat minx = 0, maxx = 0, miny = 0, maxy = 0, minz = 0, maxz = 0;
+    for (int i = 0; i < num_vertices; i++)
+    {
+        minx = vertices[i].x < minx ? vertices[i].x : minx;
+        maxx = vertices[i].x > maxx ? vertices[i].x : maxx;
+
+        miny = vertices[i].y < miny ? vertices[i].y : miny;
+        maxy = vertices[i].y > maxy ? vertices[i].y : maxy;
+
+        minz = vertices[i].z < minz ? vertices[i].z : minz;
+        maxz = vertices[i].z > maxz ? vertices[i].z : maxz;
+    }
+
+    // Center point
+    vec4 center = v4((maxx + minx) / 2, (maxy + miny) / 2, (maxz + minz) / 2, 1);
+
+    // Find largest range, use that to scale
+    GLfloat scaleFactor;
+
+    GLfloat xrange, yrange, zrange;
+    xrange = abs(maxx - minx);
+    yrange = abs(maxy - miny);
+    zrange = abs(maxz - minz);
+
+    scaleFactor = xrange;
+    if (yrange > scaleFactor)
+        scaleFactor = yrange;
+    if (zrange > scaleFactor)
+        scaleFactor = zrange;
+
+    scaleFactor = 2 / scaleFactor;
+
+    // Translate so midpoint == origin, then scale
+    mat4 t = translate(-center.x, -center.y, -center.z);
+    mat4 s = scale(scaleFactor, scaleFactor, scaleFactor);
+    mat4 tr = multMat(&s, &t);
+
+    // Translate and scale all vertices
+    for (int i = 0; i < num_vertices; i++)
+    {
+        vertices[i] = multMatVec(&tr, &vertices[i]);
+    }
 }
 
 void keyboard(unsigned char key, int mousex, int mousey)
@@ -355,7 +467,7 @@ void keyboard(unsigned char key, int mousex, int mousey)
     if (key == 'r')
     {
         ctm = identity();
-        rotateMat = identity();
+        rotate_mat = identity();
         glutPostRedisplay();
     }
 
@@ -369,6 +481,8 @@ void reshape(int width, int height)
 
 int main(int argc, char **argv)
 {
+    // TODO user menu, set texw & texh, set hasColors
+
     glutInit(&argc, argv);
     glutInitDisplayMode(GLUT_RGBA | GLUT_DOUBLE | GLUT_DEPTH);
     glutInitWindowSize(WSIZE, WSIZE);
@@ -378,7 +492,7 @@ int main(int argc, char **argv)
 
     ctm = identity();
     // INSERT SHAPE DRAWING FUNCTIONS HERE
-    unitSphere();   // REPLACE ME
+    unitSphere(); // REPLACE ME
     randColors();
 
     init();

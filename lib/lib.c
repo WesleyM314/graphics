@@ -61,6 +61,17 @@ char equalVecs(vec4 *m, vec4 *n)
 	return (m->x == n->x && m->y == n->y && m->z == n->z && m->w == n->w) ? 1 : 0;
 }
 
+char equalMats(mat4 *m, mat4 *n)
+{
+	return (
+			   equalVecs(&m->x, &n->x) &&
+			   equalVecs(&m->y, &n->y) &&
+			   equalVecs(&m->z, &n->z) &&
+			   equalVecs(&m->w, &n->w))
+			   ? 1
+			   : 0;
+}
+
 /**
  * Multiplies a vector by a scalar value, returning
  * a new 4x1 vector
@@ -124,6 +135,19 @@ vec4 crossVec(vec4 *v, vec4 *u)
 		(v->z * u->x - v->x * u->z),
 		(v->x * u->y - v->y * u->x),
 		0.0};
+}
+
+/**
+ * Return the angle between v and u
+ */
+GLfloat angleBetween(vec4 *v, vec4 *u)
+{
+	vec4 a, b;
+	a = *v;
+	b = *u;
+	a.w = 0;
+	b.w = 0;
+	return acosf(dotVec(&a, &b) / (magnitude(&a) * magnitude(&b)));
 }
 
 // MATRICES
@@ -499,4 +523,153 @@ mat4 z_rotate(GLfloat theta)
 	};
 
 	return r;
+}
+
+// PERSPECTIVE FUNCTIONS
+
+/**
+ * Returns transformation matrix to look at
+ * a certain point
+ */
+mat4 look_at(vec4 eye, vec4 at, vec4 up)
+{
+	mat4 m;
+
+	// VPN is eye - at; normalize to n
+	vec4 n = subVec(&eye, &at);
+	n = normalize(&n);
+
+	// u is (up cross n) normalized
+	vec4 u = crossVec(&up, &n);
+	u = normalize(&u);
+
+	// v is (n cross u) normalized
+	vec4 v = crossVec(&n, &u);
+	v = normalize(&v);
+
+	// Make rotation matrix
+	mat4 R = m4(u, v, n, v4(0, 0, 0, 1));
+
+	R = transpose(&R);
+
+	// Make translation matrix
+	mat4 T = m4(
+		v4(1, 0, 0, -eye.x),
+		v4(0, 1, 0, -eye.y),
+		v4(0, 0, 1, -eye.z),
+		v4(0, 0, 0, 1));
+	T = transpose(&T);
+
+	T = translate(-eye.x, -eye.y, -eye.z);
+
+	// printf("LOOK_AT T:\n");
+	// printMat(&T);
+
+	m = multMat(&R, &T);
+
+	return m;
+}
+
+/**
+ * Return a perspective projection matrix 
+ */
+mat4 perspective(GLfloat left, GLfloat right, GLfloat bottom,
+				 GLfloat top, GLfloat near, GLfloat far)
+{
+	vec4 x, y, z, w;
+	x = v4((-2 * near) / (right - left), 0, 0, 0);
+	y = v4(0, (-2 * near) / (top - bottom), 0, 0);
+	z = v4(
+		(left + right) / (right - left),
+		(bottom + top) / (top - bottom),
+		(near + far) / (far - near), -1);
+	w = v4(0, 0, (-2 * near * far) / (far - near), 0);
+
+	return m4(x, y, z, w);
+}
+
+// FUNCTIONS FOR DYNAMIC LISTS
+
+// Init v4List
+void v4ListNew(v4List *list)
+{
+	list->capacity = 512;
+	list->items = (vec4 *)malloc(sizeof(vec4) * list->capacity);
+	list->length = 0;
+}
+
+// Resize v4List
+void v4ListResize(v4List *list, int capacity)
+{
+	if (list)
+	{
+		vec4 *items = (vec4 *)realloc(list->items, sizeof(vec4) * capacity);
+		if (items)
+		{
+			list->items = items;
+			list->capacity = capacity;
+			return;
+		}
+		printf("Error reallocating memory for v4List\n");
+		exit(1);
+	}
+}
+
+// Add to v4List
+void v4ListPush(v4List *list, vec4 item)
+{
+	if (list)
+	{
+		// Check if list is full
+		if (list->capacity == list->length)
+		{
+			// Double in size
+			v4ListResize(list, list->capacity * 2);
+		}
+		// Add to end of list
+		list->items[list->length] = item;
+		list->length += 1;
+	}
+}
+
+// Init v2List
+void v2ListNew(v2List *list)
+{
+	list->capacity = 512;
+	list->items = (vec2 *)malloc(sizeof(vec2) * list->capacity);
+	list->length = 0;
+}
+
+// Resize v2List
+void v2ListResize(v2List *list, int capacity)
+{
+	if (list)
+	{
+		vec2 *items = (vec2 *)realloc(list->items, sizeof(vec2) * capacity);
+		if (items)
+		{
+			list->items = items;
+			list->capacity = capacity;
+			return;
+		}
+		printf("Error reallocating memory for v2List\n");
+		exit(1);
+	}
+}
+
+// Add to v2List
+void v2ListPush(v2List *list, vec2 item)
+{
+	if (list)
+	{
+		// Check if list is full
+		if (list->capacity == list->length)
+		{
+			// Double in size
+			v2ListResize(list, list->capacity * 2);
+		}
+		// Add to end of list
+		list->items[list->length] = item;
+		list->length += 1;
+	}
 }
