@@ -62,6 +62,8 @@ GLboolean right_flag = GL_FALSE;
 GLboolean left_flag = GL_FALSE;
 GLboolean up_flag = GL_FALSE;
 GLboolean down_flag = GL_FALSE;
+GLboolean zoom_in_flag = GL_FALSE;
+GLboolean zoom_out_flag = GL_FALSE;
 
 // GLboolean turn_front_flag = GL_FALSE;
 
@@ -165,6 +167,12 @@ int orientation[3][3][3] = {
     },
 };
 
+// Arrays to hold random turns
+Face shuffle_faces[25];
+Direction shuffle_dirs[25];
+GLboolean shuffle_flag = GL_FALSE;
+int shuffle_index = 0;
+
 /**
  * Idle animation
  */
@@ -173,30 +181,18 @@ void idle(void)
     movement_tr = identity();
     mat4 t1;
 
+    // If shuffling, set anim_face using
+    // shuffle_index
+    if (shuffle_flag)
+    {
+        anim_face = shuffle_faces[shuffle_index];
+        anim_dir = shuffle_dirs[shuffle_index];
+    }
+
     // Face turning animation
     // Turning front face
     if (animating_flag)
     {
-
-        // if (anim_face == FRONT)
-        // {
-        //     // Keep turning while steps needed
-        //     if (anim_step_count < num_anim_steps)
-        //     {
-        //         turnFace(anim_face, anim_dir);
-        //         anim_step_count++;
-        //     }
-        //     else
-        //     {
-        //         // Set animation flag to false
-        //         animating_flag = GL_FALSE;
-        //     }
-        // }
-        // if(anim_face == RIGHT)
-        // {
-
-        // }
-
         // Keep turning while steps needed
         if (anim_step_count < num_anim_steps)
         {
@@ -205,8 +201,29 @@ void idle(void)
         }
         else
         {
-            // Set animation flag to false
-            animating_flag = GL_FALSE;
+            // If shuffling, check if done with
+            // all shuffles
+            if (shuffle_flag)
+            {
+                if (shuffle_index < 24)
+                {
+                    // Reset anim_step_count
+                    anim_step_count = 0;
+                    // Increment shuffle index
+                    shuffle_index++;
+                }
+                else
+                {
+                    // Done shuffling
+                    shuffle_flag = GL_FALSE;
+                    animating_flag = GL_FALSE;
+                }
+            }
+            else
+            {
+                // Set animation flag to false
+                animating_flag = GL_FALSE;
+            }
             updateOrientation(anim_face, anim_dir);
         }
     }
@@ -273,6 +290,18 @@ void idle(void)
     if (left_flag)
     {
         t1 = y_rotate(-0.01);
+        movement_tr = multMat(&t1, &movement_tr);
+    }
+    // Zoom in
+    if(zoom_in_flag)
+    {
+        t1 = scale(0.990, 0.990, 0.990);
+        movement_tr = multMat(&t1, &movement_tr);
+    }
+    // Zoom out
+    if(zoom_out_flag)
+    {
+        t1 = scale(1.015, 1.015, 1.015);
         movement_tr = multMat(&t1, &movement_tr);
     }
 
@@ -552,6 +581,13 @@ void keyboard(unsigned char key, int mousex, int mousey)
     }
     if (key == 'q')
         glutLeaveMainLoop();
+    if(key == 's')
+    {
+        if(!animating_flag)
+        {
+            shuffle();
+        }
+    }
     if (key == 'f')
     {
         // Only start animation if no other
@@ -699,6 +735,28 @@ void keyboard(unsigned char key, int mousex, int mousey)
             animating_flag = GL_TRUE;
             anim_step_count = 0;
         }
+    }
+    // Zoom in
+    if(key == '[')
+    {
+        zoom_in_flag = GL_TRUE;
+    }
+    // Zoom out
+    if(key == ']')
+    {
+        zoom_out_flag = GL_TRUE;
+    }
+}
+
+void keyboardUp(unsigned char key, int mousex, int mousey)
+{
+    if(key == '[')
+    {
+        zoom_in_flag = GL_FALSE;
+    }
+    if(key == ']')
+    {
+        zoom_out_flag = GL_FALSE;
     }
 }
 
@@ -1171,6 +1229,20 @@ void turnFace(Face face, Direction direction)
     }
 }
 
+void shuffle()
+{
+    // Generate random faces and directions
+    for (int i = 0; i < 25; i++)
+    {
+        shuffle_faces[i] = rand() % 6; // One of 6 faces
+        shuffle_dirs[i] = rand() % 2;  // One of 2 directions
+    }
+    anim_step_count = 0;
+    shuffle_index = 0;
+    shuffle_flag = GL_TRUE;
+    animating_flag = GL_TRUE;
+}
+
 void buildCube()
 {
     // Lists for verts and colors
@@ -1242,13 +1314,14 @@ int main(int argc, char **argv)
 
     ctm = identity();
     model_view = look_at(eye, at, up);
-    projection = perspective(-0.5, 0.5, -0.5, 0.5, -0.5, -10);
+    projection = perspective(-0.5, 0.5, -0.5, 0.5, -0.5, -100);
 
     buildCube();
 
     init();
     glutDisplayFunc(display);
     glutKeyboardFunc(keyboard);
+    glutKeyboardUpFunc(keyboardUp);
     glutSpecialFunc(keySpecial);
     glutSpecialUpFunc(keySpecialUp);
     glutMouseFunc(mouse);

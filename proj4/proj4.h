@@ -33,3 +33,4 @@ void turnFace(Face face, Direction direction);
 void updateOrientation(Face face, Direction direction);
 void getOrientation(Face face, int arr[9]);
 void insertOrientation(Face face, int arr[9]);
+void shuffle();
