@@ -293,13 +293,13 @@ void idle(void)
         movement_tr = multMat(&t1, &movement_tr);
     }
     // Zoom in
-    if(zoom_in_flag)
+    if (zoom_in_flag)
     {
         t1 = scale(0.990, 0.990, 0.990);
         movement_tr = multMat(&t1, &movement_tr);
     }
     // Zoom out
-    if(zoom_out_flag)
+    if (zoom_out_flag)
     {
         t1 = scale(1.015, 1.015, 1.015);
         movement_tr = multMat(&t1, &movement_tr);
@@ -581,9 +581,9 @@ void keyboard(unsigned char key, int mousex, int mousey)
     }
     if (key == 'q')
         glutLeaveMainLoop();
-    if(key == 's')
+    if (key == 's')
     {
-        if(!animating_flag)
+        if (!animating_flag)
         {
             shuffle();
         }
@@ -737,12 +737,12 @@ void keyboard(unsigned char key, int mousex, int mousey)
         }
     }
     // Zoom in
-    if(key == '[')
+    if (key == '[')
     {
         zoom_in_flag = GL_TRUE;
     }
     // Zoom out
-    if(key == ']')
+    if (key == ']')
     {
         zoom_out_flag = GL_TRUE;
     }
@@ -750,11 +750,11 @@ void keyboard(unsigned char key, int mousex, int mousey)
 
 void keyboardUp(unsigned char key, int mousex, int mousey)
 {
-    if(key == '[')
+    if (key == '[')
     {
         zoom_in_flag = GL_FALSE;
     }
-    if(key == ']')
+    if (key == ']')
     {
         zoom_out_flag = GL_FALSE;
     }
@@ -815,7 +815,32 @@ void reshape(int width, int height)
     glViewport(0, 0, WSIZE, WSIZE);
 }
 
-void printControls() {}
+void printControls()
+{
+    printf("\nWelcome!\n\n");
+    printf("CONTROLS\n");
+    printf("------------------------------------------------\n");
+
+    printf("CAMERA CONTROLS\n\n");
+    printf("Up Arrow: Move Camera Up\n");
+    printf("Down Arrow: Move Camera Down\n");
+    printf("Right Arrow: Move Camera Right\n");
+    printf("Left Arrow: Move Camera Left\n");
+    printf("[ Key: Zoom In\n");
+    printf("] Key: Zoom Out\n");
+    
+    printf("\nCUBE CONTROLS\n");
+    printf("(Use Uppercase To Reverse Direction)\n\n");
+    printf("f: Turn Front Face\n");
+    printf("r: Turn Right Face\n");
+    printf("b: Turn Back Face\n");
+    printf("l: Turn Left Face\n");
+    printf("u: Turn Top Face\n");
+    printf("d: Turn Bottom Face\n");
+    printf("s: Shuffle Cube\n");
+    printf("ESC: Reset Cube and Camera\n\n");
+    printf("q: Quit\n\n");
+}
 
 void colorSide(Color c, v4List *list)
 {
