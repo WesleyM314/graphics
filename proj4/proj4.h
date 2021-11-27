@@ -1,8 +1,5 @@
 #define WSIZE 1024
 
-void setCurPoint(int x, int y);
-void printControls();
-
 typedef enum 
 {
 	GREEN,
@@ -29,3 +26,9 @@ typedef enum
 	FORWARD,
 	BACKWARD
 } Direction;
+
+void setCurPoint(int x, int y);
+void printControls();
+void turnFace(Face face, Direction direction);
+void updateOrientation(Face face, Direction direction);
+void getOrientation(Face face, int arr[9]);

@@ -63,9 +63,23 @@ GLboolean left_flag = GL_FALSE;
 GLboolean up_flag = GL_FALSE;
 GLboolean down_flag = GL_FALSE;
 
+// GLboolean turn_front_flag = GL_FALSE;
+
 // Transformation matrices for movement
 // and animations
 mat4 movement_tr;
+
+// Flag for animation in progress
+GLboolean animating_flag = GL_FALSE;
+// Number of steps in face turn animation
+const int num_anim_steps = 50;
+// Face rotation animation step size
+const GLfloat anim_step_size = M_PI / 2 / num_anim_steps;
+// Count animation steps done
+int anim_step_count = 0;
+// Direction to turn during animation
+Direction anim_dir;
+Face anim_face;
 
 // Colors
 vec4 green = (vec4){0.22745098, 0.478431373, 0.278431373, 1};
@@ -158,6 +172,45 @@ void idle(void)
 {
     movement_tr = identity();
     mat4 t1;
+
+    // Face turning animation
+    // Turning front face
+    if (animating_flag)
+    {
+
+        // if (anim_face == FRONT)
+        // {
+        //     // Keep turning while steps needed
+        //     if (anim_step_count < num_anim_steps)
+        //     {
+        //         turnFace(anim_face, anim_dir);
+        //         anim_step_count++;
+        //     }
+        //     else
+        //     {
+        //         // Set animation flag to false
+        //         animating_flag = GL_FALSE;
+        //     }
+        // }
+        // if(anim_face == RIGHT)
+        // {
+
+        // }
+
+        // Keep turning while steps needed
+        if (anim_step_count < num_anim_steps)
+        {
+            turnFace(anim_face, anim_dir);
+            anim_step_count++;
+        }
+        else
+        {
+            // Set animation flag to false
+            animating_flag = GL_FALSE;
+
+            // updateOrientation(anim_face, anim_dir);
+        }
+    }
 
     // Up
     if (up_flag)
@@ -456,14 +509,194 @@ void motion(int x, int y)
     // glutPostRedisplay();
 }
 
+void resetView()
+{
+    // Stop and reset any animations in progress
+    animating_flag = GL_FALSE;
+    anim_step_count = 0;
+    // Reset eye location
+    eye = v4(0, 0, 3, 1);
+    // Rotate view to 45 degrees
+    mat4 temp = x_rotate(-M_PI / 6);
+    eye = multMatVec(&temp, &eye);
+    temp = y_rotate(M_PI / 4);
+    eye = multMatVec(&temp, &eye);
+    model_view = look_at(eye, at, up);
+    // Reset all cube transforms
+    for (int i = 0; i < 27; i++)
+    {
+        cube_transforms[i] = identity();
+    }
+    // Reset cube locations
+    for (int i = 0; i < 3; i++)
+    {
+        for (int j = 0; j < 3; j++)
+        {
+            for (int k = 0; k < 3; k++)
+            {
+                orientation[i][j][k] = 9 * i + 3 * j + k;
+            }
+        }
+    }
+    glutPostRedisplay();
+}
+
 void keyboard(unsigned char key, int mousex, int mousey)
 {
+    // Use escape key to reset view
+    if (key == 27)
+    {
+        resetView();
+    }
     if (key == 'q')
         glutLeaveMainLoop();
+    if (key == 'f')
+    {
+        // Only start animation if no other
+        // animation is in progress
+        if (!animating_flag)
+        {
+            anim_dir = FORWARD;
+            anim_face = FRONT;
+            animating_flag = GL_TRUE;
+            anim_step_count = 0;
+        }
+    }
+    if (key == 'F')
+    {
+        // Only start animation if no other
+        // animation is in progress
+        if (!animating_flag)
+        {
+            anim_dir = BACKWARD;
+            anim_face = FRONT;
+            animating_flag = GL_TRUE;
+            anim_step_count = 0;
+        }
+    }
     if (key == 'r')
     {
-        ctm = identity();
-        glutPostRedisplay();
+        // Only start animation if no other
+        // animation is in progress
+        if (!animating_flag)
+        {
+            anim_dir = FORWARD;
+            anim_face = RIGHT;
+            animating_flag = GL_TRUE;
+            anim_step_count = 0;
+        }
+    }
+    if (key == 'R')
+    {
+        // Only start animation if no other
+        // animation is in progress
+        if (!animating_flag)
+        {
+            anim_dir = BACKWARD;
+            anim_face = RIGHT;
+            animating_flag = GL_TRUE;
+            anim_step_count = 0;
+        }
+    }
+    // Back
+    if (key == 'b')
+    {
+        // Only start animation if no other
+        // animation is in progress
+        if (!animating_flag)
+        {
+            anim_dir = FORWARD;
+            anim_face = BACK;
+            animating_flag = GL_TRUE;
+            anim_step_count = 0;
+        }
+    }
+    if (key == 'B')
+    {
+        // Only start animation if no other
+        // animation is in progress
+        if (!animating_flag)
+        {
+            anim_dir = BACKWARD;
+            anim_face = BACK;
+            animating_flag = GL_TRUE;
+            anim_step_count = 0;
+        }
+    }
+    // Left
+    if (key == 'l')
+    {
+        // Only start animation if no other
+        // animation is in progress
+        if (!animating_flag)
+        {
+            anim_dir = FORWARD;
+            anim_face = LEFT;
+            animating_flag = GL_TRUE;
+            anim_step_count = 0;
+        }
+    }
+    if (key == 'L')
+    {
+        // Only start animation if no other
+        // animation is in progress
+        if (!animating_flag)
+        {
+            anim_dir = BACKWARD;
+            anim_face = LEFT;
+            animating_flag = GL_TRUE;
+            anim_step_count = 0;
+        }
+    }
+    // Top
+    if (key == 'u')
+    {
+        // Only start animation if no other
+        // animation is in progress
+        if (!animating_flag)
+        {
+            anim_dir = FORWARD;
+            anim_face = TOP;
+            animating_flag = GL_TRUE;
+            anim_step_count = 0;
+        }
+    }
+    if (key == 'U')
+    {
+        // Only start animation if no other
+        // animation is in progress
+        if (!animating_flag)
+        {
+            anim_dir = BACKWARD;
+            anim_face = TOP;
+            animating_flag = GL_TRUE;
+            anim_step_count = 0;
+        }
+    }
+    // Bottom
+    if (key == 'd')
+    {
+        // Only start animation if no other
+        // animation is in progress
+        if (!animating_flag)
+        {
+            anim_dir = FORWARD;
+            anim_face = BOTTOM;
+            animating_flag = GL_TRUE;
+            anim_step_count = 0;
+        }
+    }
+    if (key == 'D')
+    {
+        // Only start animation if no other
+        // animation is in progress
+        if (!animating_flag)
+        {
+            anim_dir = BACKWARD;
+            anim_face = BOTTOM;
+            animating_flag = GL_TRUE;
+            anim_step_count = 0;
+        }
     }
 }
 
@@ -489,6 +722,8 @@ void keySpecial(int key, int mousex, int mousey)
     {
         left_flag = GL_TRUE;
     }
+    // Escape - reset view
+    // if(key == GLUT_KEY_ESC)
 }
 
 void keySpecialUp(int key, int mousex, int mousey)
@@ -683,6 +918,146 @@ void buildSmallCube(v4List *verts, v4List *color, Color color_order[6])
 
     // Free edge_ref
     v4ListFree(&edge_ref);
+}
+
+void getOrientation(Face face, int arr[9])
+{
+    switch (face)
+    {
+    case FRONT:
+        arr[0] = orientation[0][2][0];
+        arr[1] = orientation[0][2][1];
+        arr[2] = orientation[0][2][2];
+        arr[3] = orientation[1][2][0];
+        arr[4] = orientation[1][2][1];
+        arr[5] = orientation[1][2][2];
+        arr[6] = orientation[2][2][0];
+        arr[7] = orientation[2][2][1];
+        arr[8] = orientation[2][2][2];
+        break;
+    case RIGHT:
+        arr[0] = orientation[0][0][2];
+        arr[1] = orientation[0][1][2];
+        arr[2] = orientation[0][2][2];
+        arr[3] = orientation[1][0][2];
+        arr[4] = orientation[1][1][2];
+        arr[5] = orientation[1][2][2];
+        arr[6] = orientation[2][0][2];
+        arr[7] = orientation[2][1][2];
+        arr[8] = orientation[2][2][2];
+        break;
+    case BACK:
+        arr[0] = orientation[0][0][0];
+        arr[1] = orientation[0][0][1];
+        arr[2] = orientation[0][0][2];
+        arr[3] = orientation[1][0][0];
+        arr[4] = orientation[1][0][1];
+        arr[5] = orientation[1][0][2];
+        arr[6] = orientation[2][0][0];
+        arr[7] = orientation[2][0][1];
+        arr[8] = orientation[2][0][2];
+        break;
+    case LEFT:
+        arr[0] = orientation[0][0][0];
+        arr[1] = orientation[0][1][0];
+        arr[2] = orientation[0][2][0];
+        arr[3] = orientation[1][0][0];
+        arr[4] = orientation[1][1][0];
+        arr[5] = orientation[1][2][0];
+        arr[6] = orientation[2][0][0];
+        arr[7] = orientation[2][1][0];
+        arr[8] = orientation[2][2][0];
+        break;
+    case TOP:
+        arr[0] = orientation[0][0][0];
+        arr[1] = orientation[0][0][1];
+        arr[2] = orientation[0][0][2];
+        arr[3] = orientation[0][1][0];
+        arr[4] = orientation[0][1][1];
+        arr[5] = orientation[0][1][2];
+        arr[6] = orientation[0][2][0];
+        arr[7] = orientation[0][2][1];
+        arr[8] = orientation[0][2][2];
+        break;
+    case BOTTOM:
+        arr[0] = orientation[2][0][0];
+        arr[1] = orientation[2][0][1];
+        arr[2] = orientation[2][0][2];
+        arr[3] = orientation[2][1][0];
+        arr[4] = orientation[2][1][1];
+        arr[5] = orientation[2][1][2];
+        arr[6] = orientation[2][2][0];
+        arr[7] = orientation[2][2][1];
+        arr[8] = orientation[2][2][2];
+        break;
+    }
+}
+
+/**
+ * Turn a face of the cube either forwards
+ * or backwards by LEFT HAND RULE
+ */
+void turnFace(Face face, Direction direction)
+{
+    // Rotational matrix
+    mat4 r;
+    GLfloat theta;
+
+    // Select which small cubes need to be
+    // moved by using the 3x3x3 orientation
+    // matrix. Don't worry about updating
+    // it; that will be done by idle() when
+    // animation is done
+    int cubes_to_move[9];
+    getOrientation(face, cubes_to_move);
+    switch (face)
+    {
+    case FRONT:
+        // If forward, use negative theta
+        theta = (direction == FORWARD) ? -anim_step_size : anim_step_size;
+        // theta = (direction == FORWARD) ? -M_PI / 4 : M_PI / 4;
+        // Get rotational matrix
+        r = z_rotate(theta);
+        break;
+    case RIGHT:
+        // If forward, use negative theta
+        theta = (direction == FORWARD) ? -anim_step_size : anim_step_size;
+        // Rotate about x axis
+        r = x_rotate(theta);
+        break;
+    case BACK:
+        // If forward, use positive theta
+        theta = (direction == FORWARD) ? anim_step_size : -anim_step_size;
+        // Rotate about z axis
+        r = z_rotate(theta);
+        break;
+    case LEFT:
+        // If forward, use positive theta
+        theta = (direction == FORWARD) ? anim_step_size : -anim_step_size;
+        // Rotate about x axis
+        r = x_rotate(theta);
+        break;
+    case TOP:
+        // If forward, use negative theta
+        theta = (direction == FORWARD) ? -anim_step_size : anim_step_size;
+        // Rotate about y axis
+        r = y_rotate(theta);
+        break;
+    case BOTTOM:
+        // If forward, use positive theta
+        theta = (direction == FORWARD) ? anim_step_size : -anim_step_size;
+        // Rotate about y axis
+        r = y_rotate(theta);
+        break;
+    }
+    // Update appropriate cube_transforms entries
+    // using index values in cubes_to_move
+    int index;
+    for (int i = 0; i < 9; i++)
+    {
+        index = cubes_to_move[i];
+        cube_transforms[index] = multMat(&r, &cube_transforms[index]);
+    }
 }
 
 void buildCube()
