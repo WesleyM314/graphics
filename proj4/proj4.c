@@ -207,8 +207,7 @@ void idle(void)
         {
             // Set animation flag to false
             animating_flag = GL_FALSE;
-
-            // updateOrientation(anim_face, anim_dir);
+            updateOrientation(anim_face, anim_dir);
         }
     }
 
@@ -514,6 +513,7 @@ void resetView()
     // Stop and reset any animations in progress
     animating_flag = GL_FALSE;
     anim_step_count = 0;
+
     // Reset eye location
     eye = v4(0, 0, 3, 1);
     // Rotate view to 45 degrees
@@ -522,11 +522,13 @@ void resetView()
     temp = y_rotate(M_PI / 4);
     eye = multMatVec(&temp, &eye);
     model_view = look_at(eye, at, up);
+
     // Reset all cube transforms
     for (int i = 0; i < 27; i++)
     {
         cube_transforms[i] = identity();
     }
+
     // Reset cube locations
     for (int i = 0; i < 3; i++)
     {
@@ -936,26 +938,26 @@ void getOrientation(Face face, int arr[9])
         arr[8] = orientation[2][2][2];
         break;
     case RIGHT:
-        arr[0] = orientation[0][0][2];
+        arr[0] = orientation[0][2][2];
         arr[1] = orientation[0][1][2];
-        arr[2] = orientation[0][2][2];
-        arr[3] = orientation[1][0][2];
+        arr[2] = orientation[0][0][2];
+        arr[3] = orientation[1][2][2];
         arr[4] = orientation[1][1][2];
-        arr[5] = orientation[1][2][2];
-        arr[6] = orientation[2][0][2];
+        arr[5] = orientation[1][0][2];
+        arr[6] = orientation[2][2][2];
         arr[7] = orientation[2][1][2];
-        arr[8] = orientation[2][2][2];
+        arr[8] = orientation[2][0][2];
         break;
     case BACK:
-        arr[0] = orientation[0][0][0];
+        arr[0] = orientation[0][0][2];
         arr[1] = orientation[0][0][1];
-        arr[2] = orientation[0][0][2];
-        arr[3] = orientation[1][0][0];
+        arr[2] = orientation[0][0][0];
+        arr[3] = orientation[1][0][2];
         arr[4] = orientation[1][0][1];
-        arr[5] = orientation[1][0][2];
-        arr[6] = orientation[2][0][0];
+        arr[5] = orientation[1][0][0];
+        arr[6] = orientation[2][0][2];
         arr[7] = orientation[2][0][1];
-        arr[8] = orientation[2][0][2];
+        arr[8] = orientation[2][0][0];
         break;
     case LEFT:
         arr[0] = orientation[0][0][0];
@@ -980,17 +982,126 @@ void getOrientation(Face face, int arr[9])
         arr[8] = orientation[0][2][2];
         break;
     case BOTTOM:
-        arr[0] = orientation[2][0][0];
-        arr[1] = orientation[2][0][1];
-        arr[2] = orientation[2][0][2];
+        arr[0] = orientation[2][2][0];
+        arr[1] = orientation[2][2][1];
+        arr[2] = orientation[2][2][2];
         arr[3] = orientation[2][1][0];
         arr[4] = orientation[2][1][1];
         arr[5] = orientation[2][1][2];
-        arr[6] = orientation[2][2][0];
-        arr[7] = orientation[2][2][1];
-        arr[8] = orientation[2][2][2];
+        arr[6] = orientation[2][0][0];
+        arr[7] = orientation[2][0][1];
+        arr[8] = orientation[2][0][2];
         break;
     }
+}
+
+void insertOrientation(Face face, int arr[9])
+{
+    switch (face)
+    {
+    case FRONT:
+        orientation[0][2][0] = arr[0];
+        orientation[0][2][1] = arr[1];
+        orientation[0][2][2] = arr[2];
+        orientation[1][2][0] = arr[3];
+        orientation[1][2][1] = arr[4];
+        orientation[1][2][2] = arr[5];
+        orientation[2][2][0] = arr[6];
+        orientation[2][2][1] = arr[7];
+        orientation[2][2][2] = arr[8];
+        break;
+    case RIGHT:
+        orientation[0][2][2] = arr[0];
+        orientation[0][1][2] = arr[1];
+        orientation[0][0][2] = arr[2];
+        orientation[1][2][2] = arr[3];
+        orientation[1][1][2] = arr[4];
+        orientation[1][0][2] = arr[5];
+        orientation[2][2][2] = arr[6];
+        orientation[2][1][2] = arr[7];
+        orientation[2][0][2] = arr[8];
+        break;
+    case BACK:
+        orientation[0][0][2] = arr[0];
+        orientation[0][0][1] = arr[1];
+        orientation[0][0][0] = arr[2];
+        orientation[1][0][2] = arr[3];
+        orientation[1][0][1] = arr[4];
+        orientation[1][0][0] = arr[5];
+        orientation[2][0][2] = arr[6];
+        orientation[2][0][1] = arr[7];
+        orientation[2][0][0] = arr[8];
+        break;
+    case LEFT:
+        orientation[0][0][0] = arr[0];
+        orientation[0][1][0] = arr[1];
+        orientation[0][2][0] = arr[2];
+        orientation[1][0][0] = arr[3];
+        orientation[1][1][0] = arr[4];
+        orientation[1][2][0] = arr[5];
+        orientation[2][0][0] = arr[6];
+        orientation[2][1][0] = arr[7];
+        orientation[2][2][0] = arr[8];
+        break;
+    case TOP:
+        orientation[0][0][0] = arr[0];
+        orientation[0][0][1] = arr[1];
+        orientation[0][0][2] = arr[2];
+        orientation[0][1][0] = arr[3];
+        orientation[0][1][1] = arr[4];
+        orientation[0][1][2] = arr[5];
+        orientation[0][2][0] = arr[6];
+        orientation[0][2][1] = arr[7];
+        orientation[0][2][2] = arr[8];
+        break;
+    case BOTTOM:
+        orientation[2][2][0] = arr[0];
+        orientation[2][2][1] = arr[1];
+        orientation[2][2][2] = arr[2];
+        orientation[2][1][0] = arr[3];
+        orientation[2][1][1] = arr[4];
+        orientation[2][1][2] = arr[5];
+        orientation[2][0][0] = arr[6];
+        orientation[2][0][1] = arr[7];
+        orientation[2][0][2] = arr[8];
+        break;
+    }
+}
+
+void spinArr(int arr[9], unsigned char direction)
+{
+    // Direction: 0 == right, 1 == left
+    // If left, do this 3 times
+    int num_turns = (direction == 0) ? 1 : 3;
+    for (int k = 0; k < num_turns; k++)
+    {
+        for (int i = 0; i < 3 / 2; i++)
+        {
+            for (int j = i; j < 2 - i; j++)
+            {
+                int temp = arr[3 * i + j];
+                arr[3 * i + j] = arr[3 * (2 - j) + i];
+                arr[3 * (2 - j) + i] = arr[3 * (2 - i) + (2 - j)];
+                arr[3 * (2 - i) + (2 - j)] = arr[3 * j + (2 - i)];
+                arr[3 * j + (2 - i)] = temp;
+            }
+        }
+    }
+}
+
+void updateOrientation(Face face, Direction direction)
+{
+    // Get orientation of face
+    int face_arr[9];
+    getOrientation(face, face_arr);
+
+    int dir;
+    // Rotate right for forward, left for back
+    dir = (direction == FORWARD) ? 0 : 1;
+    // Rotate array
+    spinArr(face_arr, dir);
+    // Insert back into orientation
+    insertOrientation(face, face_arr);
 }
 
 /**
