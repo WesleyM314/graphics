@@ -598,6 +598,12 @@ void v4ListNew(v4List *list)
 	list->length = 0;
 }
 
+// Free space held by v4List
+void v4ListFree(v4List *list)
+{
+	free(list->items);
+}
+
 // Resize v4List
 void v4ListResize(v4List *list, int capacity)
 {

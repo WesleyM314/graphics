@@ -102,6 +102,7 @@ mat4 perspective(GLfloat left, GLfloat right, GLfloat bottom,
 				 GLfloat top, GLfloat near, GLfloat far);
 
 void v4ListNew(v4List *list);
+void v4ListFree(v4List *list);
 void v4ListResize(v4List *list, int capacity);
 void v4ListPush(v4List *list, vec4 item);
 

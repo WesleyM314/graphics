@@ -8,12 +8,5 @@ uniform int use_color;
 
 void main()
 {
-	if(use_color == 1)
-	{
-		gl_FragColor = color;
-	}
-	else
-	{
-		gl_FragColor = texture2D(texture, texCoord);
-	}
+	gl_FragColor = color;
 }
