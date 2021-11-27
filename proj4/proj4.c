@@ -32,6 +32,8 @@ GLuint model_view_location;
 GLuint projection_location;
 GLuint draw_cube_location;
 GLuint cube_transform_location;
+GLuint draw_ball_location;
+GLuint ball_transform_location;
 
 // Arrays for vertices and colors
 vec4 *vertices;
@@ -64,6 +66,14 @@ GLboolean up_flag = GL_FALSE;
 GLboolean down_flag = GL_FALSE;
 GLboolean zoom_in_flag = GL_FALSE;
 GLboolean zoom_out_flag = GL_FALSE;
+
+// Flags for light source movements
+GLboolean light_right_flag = GL_FALSE;
+GLboolean light_left_flag = GL_FALSE;
+GLboolean light_up_flag = GL_FALSE;
+GLboolean light_down_flag = GL_FALSE;
+GLboolean light_forward_flag = GL_FALSE;
+GLboolean light_back_flag = GL_FALSE;
 
 // GLboolean turn_front_flag = GL_FALSE;
 
@@ -142,6 +152,9 @@ Color color_orders[27][6] = {
 // Array to hold translation matrices
 // for each individual small cube
 mat4 cube_transforms[27];
+
+// Array to translate the ball
+mat4 ball_transform;
 
 // Matrices to keep track of which blocks are
 // on which faces. Indeces follow the same
@@ -226,6 +239,44 @@ void idle(void)
             }
             updateOrientation(anim_face, anim_dir);
         }
+    }
+
+    // Move light source
+    // Up
+    if(light_up_flag)
+    {
+        t1 = translate(0, 0.01, 0);
+        ball_transform = multMat(&t1, &ball_transform);
+    }
+    // Down
+    if(light_down_flag)
+    {
+        t1 = translate(0, -0.01, 0);
+        ball_transform = multMat(&t1, &ball_transform);
+    }
+    // Right
+    if(light_right_flag)
+    {
+        t1 = translate(0.01, 0, 0);
+        ball_transform = multMat(&t1, &ball_transform);
+    }
+    // Left
+    if(light_left_flag)
+    {
+        t1 = translate(-0.01, 0, 0);
+        ball_transform = multMat(&t1, &ball_transform);
+    }
+    // Forward
+    if(light_forward_flag)
+    {
+        t1 = translate(0, 0, -0.01);
+        ball_transform = multMat(&t1, &ball_transform);
+    }
+    // Back
+    if(light_back_flag)
+    {
+        t1 = translate(0, 0, 0.01);
+        ball_transform = multMat(&t1, &ball_transform);
     }
 
     // Up
@@ -402,6 +453,10 @@ void init(void)
     draw_cube_location = glGetUniformLocation(program, "draw_cube");
     // Locate cube_transform
     cube_transform_location = glGetUniformLocation(program, "cube_transform");
+    // Locate draw_ball
+    draw_ball_location = glGetUniformLocation(program, "draw_ball");
+    // Locate ball_transform
+    ball_transform_location = glGetUniformLocation(program, "ball_transform");
 
     glEnable(GL_CULL_FACE);
     glEnable(GL_DEPTH_TEST);
@@ -433,6 +488,12 @@ void display(void)
         glDrawArrays(GL_TRIANGLES, i * VERTS_PER_CUBE, VERTS_PER_CUBE);
     }
     glUniform1i(draw_cube_location, 0);
+
+    // Draw ball
+    glUniform1i(draw_ball_location, 1);
+    glUniformMatrix4fv(ball_transform_location, 1, GL_FALSE, (GLfloat *)&ball_transform);
+    glDrawArrays(GL_TRIANGLES, 27 * VERTS_PER_CUBE, num_vertices - 27 * VERTS_PER_CUBE);
+    glUniform1i(draw_ball_location, 0);
 
     glutSwapBuffers();
 }
@@ -551,6 +612,9 @@ void resetView()
     temp = y_rotate(M_PI / 4);
     eye = multMatVec(&temp, &eye);
     model_view = look_at(eye, at, up);
+
+    // Reset light location
+    ball_transform = identity();
 
     // Reset all cube transforms
     for (int i = 0; i < 27; i++)
@@ -746,6 +810,38 @@ void keyboard(unsigned char key, int mousex, int mousey)
     {
         zoom_out_flag = GL_TRUE;
     }
+
+    // Move Light source
+    // Left
+    if(key == 'x')
+    {
+        light_left_flag = GL_TRUE;
+    }
+    // Right
+    if(key == 'X')
+    {
+        light_right_flag = GL_TRUE;
+    }
+    // Up
+    if(key == 'Y')
+    {
+        light_up_flag = GL_TRUE;
+    }
+    // Down
+    if(key == 'y')
+    {
+        light_down_flag = GL_TRUE;
+    }
+    // Forward
+    if(key == 'z')
+    {
+        light_forward_flag = GL_TRUE;
+    }
+    // Back
+    if(key == 'Z')
+    {
+        light_back_flag = GL_TRUE;
+    }
 }
 
 void keyboardUp(unsigned char key, int mousex, int mousey)
@@ -757,6 +853,37 @@ void keyboardUp(unsigned char key, int mousex, int mousey)
     if (key == ']')
     {
         zoom_out_flag = GL_FALSE;
+    }
+    // Move Light source
+    // Left
+    if(key == 'x')
+    {
+        light_left_flag = GL_FALSE;
+    }
+    // Right
+    if(key == 'X')
+    {
+        light_right_flag = GL_FALSE;
+    }
+    // Up
+    if(key == 'Y')
+    {
+        light_up_flag = GL_FALSE;
+    }
+    // Down
+    if(key == 'y')
+    {
+        light_down_flag = GL_FALSE;
+    }
+    // Forward
+    if(key == 'z')
+    {
+        light_forward_flag = GL_FALSE;
+    }
+    // Back
+    if(key == 'Z')
+    {
+        light_back_flag = GL_FALSE;
     }
 }
 
@@ -828,7 +955,7 @@ void printControls()
     printf("Left Arrow: Move Camera Left\n");
     printf("[ Key: Zoom In\n");
     printf("] Key: Zoom Out\n");
-    
+
     printf("\nCUBE CONTROLS\n");
     printf("(Use Uppercase To Reverse Direction)\n\n");
     printf("f: Turn Front Face\n");
@@ -1306,6 +1433,82 @@ void buildCube()
         }
     }
 
+    // Build ball
+    v4List ball;
+    v4ListNew(&ball);
+    GLfloat theta;
+    mat4 r;
+    int segments = 40, rings = 40;
+
+    vec4 *ref1 = (vec4 *)malloc(sizeof(vec4) * (rings + 1));
+    vec4 *ref2 = (vec4 *)malloc(sizeof(vec4) * (rings + 1));
+    theta = M_PI / rings;
+    ref1[0] = v4(0, 1, 0, 1);
+    r = z_rotate(-theta);
+    for (int i = 1; i <= rings; i++)
+    {
+        ref1[i] = multMatVec(&r, &ref1[i - 1]);
+    }
+
+    // Copy ref1 to ref2 and rotate about y axis
+    theta = 2 * M_PI / segments;
+    r = y_rotate(theta);
+    for (int i = 0; i <= rings; i++)
+    {
+        ref2[i] = multMatVec(&r, &ref1[i]);
+    }
+
+    // Rotate ref segment about y axis, adding triangles
+    for (int i = 0; i < segments; i++)
+    {
+        for (int j = 0; j <= rings; j++)
+        {
+            if (j == 0)
+            {
+                v4ListPush(&ball, ref1[0]);
+                v4ListPush(&ball, ref1[1]);
+                v4ListPush(&ball, ref2[1]);
+            }
+            else if (j == rings)
+            {
+                v4ListPush(&ball, ref1[j - 1]);
+                v4ListPush(&ball, ref1[j]);
+                v4ListPush(&ball, ref2[j - 1]);
+            }
+            else
+            {
+                v4ListPush(&ball, ref1[j]);
+                v4ListPush(&ball, ref1[j + 1]);
+                v4ListPush(&ball, ref2[j]);
+
+                v4ListPush(&ball, ref1[j + 1]);
+                v4ListPush(&ball, ref2[j + 1]);
+                v4ListPush(&ball, ref2[j]);
+            }
+        }
+
+        // Rotate ref1 and ref2 about y axis
+        for (int j = 0; j <= rings; j++)
+        {
+            ref1[j] = multMatVec(&r, &ref1[j]);
+            ref2[j] = multMatVec(&r, &ref2[j]);
+        }
+    }
+
+    // Ball needs scaled down and moved up y axis
+    tr = scale(0.25, 0.25, 0.25);
+    r = translate(0, 1.25, 0);
+    tr = multMat(&r, &tr);
+
+    // Copy ball verts to list, scaling and moving
+    for (int i = 0; i < ball.length; i++)
+    {
+        v4ListPush(&vert_list, multMatVec(&tr, &ball.items[i]));
+
+        // Add white for all ball verts
+        v4ListPush(&color_list, white);
+    }
+
     // Transfer lists
     vertices = vert_list.items;
     colors = color_list.items;
@@ -1323,6 +1526,8 @@ int main(int argc, char **argv)
     {
         cube_transforms[i] = identity();
     }
+    // Set ball transform to identity
+    ball_transform = identity();
 
     // Rotate view to 45 degrees
     mat4 temp = x_rotate(-M_PI / 6);
