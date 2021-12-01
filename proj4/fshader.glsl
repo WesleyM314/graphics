@@ -5,8 +5,16 @@ varying vec4 color;
 
 uniform sampler2D texture;
 uniform int use_color;
+uniform int draw_shadow;
 
 void main()
 {
-	gl_FragColor = color;
+	if(draw_shadow == 0)
+	{
+		gl_FragColor = color;
+	}
+	else 
+	{
+		gl_FragColor = vec4(0.1, 0.1, 0.1, 1.0);
+	}
 }

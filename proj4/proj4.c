@@ -19,6 +19,9 @@
 #define BUFFER_OFFSET(offset) ((GLvoid *)(offset))
 #define DEBUG 1
 #define VERTS_PER_CUBE 132
+#define VERTS_PER_BALL 9600
+#define LIGHT_MOVE_SPEED 0.05
+#define PLANE_MOVE_SPEED 0.05
 
 // Pipeline transformation matrices
 mat4 ctm;
@@ -34,6 +37,9 @@ GLuint draw_cube_location;
 GLuint cube_transform_location;
 GLuint draw_ball_location;
 GLuint ball_transform_location;
+GLuint draw_shadow_location;
+GLuint shadow_plane_y_location;
+GLuint light_position_location;
 
 // Arrays for vertices and colors
 vec4 *vertices;
@@ -75,6 +81,10 @@ GLboolean light_down_flag = GL_FALSE;
 GLboolean light_forward_flag = GL_FALSE;
 GLboolean light_back_flag = GL_FALSE;
 
+// Flags for plane movement
+GLboolean plane_up_flag = GL_FALSE;
+GLboolean plane_down_flag = GL_FALSE;
+
 // GLboolean turn_front_flag = GL_FALSE;
 
 // Transformation matrices for movement
@@ -84,7 +94,7 @@ mat4 movement_tr;
 // Flag for animation in progress
 GLboolean animating_flag = GL_FALSE;
 // Number of steps in face turn animation
-const int num_anim_steps = 50;
+const int num_anim_steps = 30;
 // Face rotation animation step size
 const GLfloat anim_step_size = M_PI / 2 / num_anim_steps;
 // Count animation steps done
@@ -153,8 +163,15 @@ Color color_orders[27][6] = {
 // for each individual small cube
 mat4 cube_transforms[27];
 
+// Ball's current position
+vec4 ball_position = (vec4){0, 10, 0, 1};
 // Array to translate the ball
 mat4 ball_transform;
+
+// Shadow plane's y position
+GLfloat plane_y = -5;
+// Matrix to allow moving plane
+mat4 plane_transform;
 
 // Matrices to keep track of which blocks are
 // on which faces. Indeces follow the same
@@ -243,42 +260,50 @@ void idle(void)
 
     // Move light source
     // Up
-    if(light_up_flag)
+    if (light_up_flag)
     {
-        t1 = translate(0, 0.01, 0);
-        ball_transform = multMat(&t1, &ball_transform);
+        ball_position.y += LIGHT_MOVE_SPEED;
     }
     // Down
-    if(light_down_flag)
+    if (light_down_flag)
     {
-        t1 = translate(0, -0.01, 0);
-        ball_transform = multMat(&t1, &ball_transform);
+        ball_position.y -= LIGHT_MOVE_SPEED;
     }
     // Right
-    if(light_right_flag)
+    if (light_right_flag)
     {
-        t1 = translate(0.01, 0, 0);
-        ball_transform = multMat(&t1, &ball_transform);
+        ball_position.x += LIGHT_MOVE_SPEED;
     }
     // Left
-    if(light_left_flag)
+    if (light_left_flag)
     {
-        t1 = translate(-0.01, 0, 0);
-        ball_transform = multMat(&t1, &ball_transform);
+        ball_position.x -= LIGHT_MOVE_SPEED;
     }
     // Forward
-    if(light_forward_flag)
+    if (light_forward_flag)
     {
-        t1 = translate(0, 0, -0.01);
-        ball_transform = multMat(&t1, &ball_transform);
+        ball_position.z -= LIGHT_MOVE_SPEED;
     }
     // Back
-    if(light_back_flag)
+    if (light_back_flag)
     {
-        t1 = translate(0, 0, 0.01);
-        ball_transform = multMat(&t1, &ball_transform);
+        ball_position.z += LIGHT_MOVE_SPEED;
     }
+    // Update light source
+    ball_transform = translate(ball_position.x, ball_position.y, ball_position.z);
 
+    // Move shadow plane
+    if (plane_up_flag)
+    {
+        plane_y += PLANE_MOVE_SPEED;
+    }
+    if (plane_down_flag)
+    {
+        plane_y -= PLANE_MOVE_SPEED;
+    }
+    plane_transform = translate(0, plane_y, 0);
+
+    // Move camera
     // Up
     if (up_flag)
     {
@@ -457,11 +482,17 @@ void init(void)
     draw_ball_location = glGetUniformLocation(program, "draw_ball");
     // Locate ball_transform
     ball_transform_location = glGetUniformLocation(program, "ball_transform");
+    // Locate draw_shadow
+    draw_shadow_location = glGetUniformLocation(program, "draw_shadow");
+    // Locate shadow_plane_y
+    shadow_plane_y_location = glGetUniformLocation(program, "shadow_plane_y");
+    // Locate light_position
+    light_position_location = glGetUniformLocation(program, "light_position");
 
     glEnable(GL_CULL_FACE);
     glEnable(GL_DEPTH_TEST);
     // TODO reset to black
-    glClearColor(0.5, 0.5, 0.5, 1.0);
+    glClearColor(0.3, 0.3, 0.3, 1.0);
     glDepthRange(1, 0);
 }
 
@@ -476,24 +507,43 @@ void display(void)
     glUniformMatrix4fv(model_view_location, 1, GL_FALSE, (GLfloat *)&model_view);
     glUniformMatrix4fv(projection_location, 1, GL_FALSE, (GLfloat *)&projection);
 
-    // glDrawArrays(GL_TRIANGLES, 0, num_vertices);
+    // Pass in values about light and shadow plane
+    // for fake shadow calculations
+    glUniform4fv(light_position_location, 1, (GLfloat *)&ball_position);
+    glUniform1f(shadow_plane_y_location, plane_y + 0.001);
 
     // Draw cubes, giving each its own translation matrix
-    // int offset = 0;
+    int offset = 0;
     glUniform1i(draw_cube_location, 1);
     for (int i = 0; i < 27; i++)
     {
         // Set cube_transform
         glUniformMatrix4fv(cube_transform_location, 1, GL_FALSE, (GLfloat *)&cube_transforms[i]);
-        glDrawArrays(GL_TRIANGLES, i * VERTS_PER_CUBE, VERTS_PER_CUBE);
+        glDrawArrays(GL_TRIANGLES, offset, VERTS_PER_CUBE);
+
+        // Draw again as shadow
+        glUniform1i(draw_shadow_location, 1);
+        glDrawArrays(GL_TRIANGLES, offset, VERTS_PER_CUBE);
+        glUniform1i(draw_shadow_location, 0);
+
+        offset += VERTS_PER_CUBE;
     }
     glUniform1i(draw_cube_location, 0);
 
     // Draw ball
     glUniform1i(draw_ball_location, 1);
     glUniformMatrix4fv(ball_transform_location, 1, GL_FALSE, (GLfloat *)&ball_transform);
-    glDrawArrays(GL_TRIANGLES, 27 * VERTS_PER_CUBE, num_vertices - 27 * VERTS_PER_CUBE);
+    glDrawArrays(GL_TRIANGLES, offset, VERTS_PER_BALL);
     glUniform1i(draw_ball_location, 0);
+    offset += VERTS_PER_BALL;
+
+    // Draw plane for shadow
+    // Can use same part of vshader as cube drawing, just pass
+    // plane_transform in place of cube_transform
+    glUniform1i(draw_cube_location, 1);
+    glUniformMatrix4fv(cube_transform_location, 1, GL_FALSE, (GLfloat *)&plane_transform);
+    glDrawArrays(GL_TRIANGLES, offset, 6);
+    offset += 6;
 
     glutSwapBuffers();
 }
@@ -614,7 +664,8 @@ void resetView()
     model_view = look_at(eye, at, up);
 
     // Reset light location
-    ball_transform = identity();
+    ball_position = v4(0, 2, 0, 1);
+    ball_transform = translate(ball_position.x, ball_position.y, ball_position.z);
 
     // Reset all cube transforms
     for (int i = 0; i < 27; i++)
@@ -633,6 +684,7 @@ void resetView()
             }
         }
     }
+
     glutPostRedisplay();
 }
 
@@ -813,34 +865,47 @@ void keyboard(unsigned char key, int mousex, int mousey)
 
     // Move Light source
     // Left
-    if(key == 'x')
+    if (key == 'x')
     {
         light_left_flag = GL_TRUE;
     }
     // Right
-    if(key == 'X')
+    if (key == 'X')
     {
         light_right_flag = GL_TRUE;
     }
     // Up
-    if(key == 'Y')
+    if (key == 'Y')
     {
         light_up_flag = GL_TRUE;
     }
     // Down
-    if(key == 'y')
+    if (key == 'y')
     {
         light_down_flag = GL_TRUE;
     }
     // Forward
-    if(key == 'z')
+    if (key == 'z')
     {
         light_forward_flag = GL_TRUE;
     }
     // Back
-    if(key == 'Z')
+    if (key == 'Z')
     {
         light_back_flag = GL_TRUE;
+    }
+
+    // Move plane up and down
+    // Down
+    if (key == 'a')
+    {
+        plane_down_flag = GL_TRUE;
+    }
+
+    // Up
+    if (key == 'A')
+    {
+        plane_up_flag = GL_TRUE;
     }
 }
 
@@ -856,34 +921,47 @@ void keyboardUp(unsigned char key, int mousex, int mousey)
     }
     // Move Light source
     // Left
-    if(key == 'x')
+    if (key == 'x')
     {
         light_left_flag = GL_FALSE;
     }
     // Right
-    if(key == 'X')
+    if (key == 'X')
     {
         light_right_flag = GL_FALSE;
     }
     // Up
-    if(key == 'Y')
+    if (key == 'Y')
     {
         light_up_flag = GL_FALSE;
     }
     // Down
-    if(key == 'y')
+    if (key == 'y')
     {
         light_down_flag = GL_FALSE;
     }
     // Forward
-    if(key == 'z')
+    if (key == 'z')
     {
         light_forward_flag = GL_FALSE;
     }
     // Back
-    if(key == 'Z')
+    if (key == 'Z')
     {
         light_back_flag = GL_FALSE;
+    }
+
+    // Move plane up and down
+    // Down
+    if (key == 'a')
+    {
+        plane_down_flag = GL_FALSE;
+    }
+
+    // Up
+    if (key == 'A')
+    {
+        plane_up_flag = GL_FALSE;
     }
 }
 
@@ -1497,7 +1575,7 @@ void buildCube()
 
     // Ball needs scaled down and moved up y axis
     tr = scale(0.25, 0.25, 0.25);
-    r = translate(0, 1.25, 0);
+    r = translate(ball_position.x, ball_position.y, ball_position.z);
     tr = multMat(&r, &tr);
 
     // Copy ball verts to list, scaling and moving
@@ -1507,6 +1585,20 @@ void buildCube()
 
         // Add white for all ball verts
         v4ListPush(&color_list, white);
+    }
+
+    // Create large plane for shadow
+    v4ListPush(&vert_list, v4(-10, 0, -10, 1.0));
+    v4ListPush(&vert_list, v4(-10, 0, 10, 1.0));
+    v4ListPush(&vert_list, v4(10, 0, 10, 1.0));
+
+    v4ListPush(&vert_list, v4(-10, 0, -10, 1.0));
+    v4ListPush(&vert_list, v4(10, 0, 10, 1.0));
+    v4ListPush(&vert_list, v4(10, 0, -10, 1.0));
+
+    for (int i = 0; i < 6; i++)
+    {
+        v4ListPush(&color_list, v4(0.85, 0.85, 0.85, 1.0));
     }
 
     // Transfer lists
@@ -1528,6 +1620,8 @@ int main(int argc, char **argv)
     }
     // Set ball transform to identity
     ball_transform = identity();
+    // Set plane transform
+    plane_transform = translate(0, plane_y, 0);
 
     // Rotate view to 45 degrees
     mat4 temp = x_rotate(-M_PI / 6);
