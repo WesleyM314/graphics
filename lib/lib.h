@@ -74,6 +74,7 @@ vec4 normalize(vec4 *v);
 float dotVec(vec4 *v, vec4 *u);
 vec4 crossVec(vec4 *v, vec4 *u);
 GLfloat angleBetween(vec4 *v, vec4 *u);
+vec4 product(vec4 *v, vec4 *u);
 
 mat4 m4(vec4 x, vec4 y, vec4 z, vec4 w);
 void printMat(mat4 *m);

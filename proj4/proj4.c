@@ -39,17 +39,24 @@ GLuint draw_ball_location;
 GLuint ball_transform_location;
 GLuint draw_shadow_location;
 GLuint shadow_plane_y_location;
+GLuint draw_plane_location;
 GLuint light_position_location;
+GLuint ambient_product_location;
+GLuint diffuse_product_location;
+GLuint specular_product_location;
+GLuint shininess_location;
 
 // Arrays for vertices and colors
 vec4 *vertices;
 vec4 *colors;
 vec2 *tex_coords;
+vec4 *normals;
 
 // Vertex quantities
 int num_vertices = 0;
 int num_colors = 0;
 int num_tex_coords = 0;
+int num_normals = 0;
 
 // Flag for file including colors
 GLboolean has_colors = GL_FALSE;
@@ -105,7 +112,7 @@ Face anim_face;
 vec4 green = (vec4){0.22745098, 0.478431373, 0.278431373, 1};
 vec4 red = (vec4){0.588235294, 0.270588235, 0.274509804, 1};
 vec4 blue = (vec4){47.0 / 255, 86.0 / 255, 207.0 / 255, 1};
-vec4 orange = (vec4){235.0 / 255, 159.0 / 255, 37.0 / 255, 1};
+vec4 orange = (vec4){204.0 / 255, 129.0 / 255, 10.0 / 255, 1};
 vec4 yellow = (vec4){1.0, 1.0, 0, 1};
 vec4 white = (vec4){1, 1, 1, 1};
 vec4 black = (vec4){0, 0, 0, 1};
@@ -165,6 +172,18 @@ mat4 cube_transforms[27];
 vec4 ball_position = (vec4){0, 10, 0, 1};
 // Array to translate the ball
 mat4 ball_transform;
+
+// Variables to define light qualities
+vec4 light_ambient = (vec4){0.1, 0.1, 0.1, 1.0};
+vec4 light_diffuse = (vec4){1.0, 1.0, 1.0, 1.0};
+vec4 light_specular = (vec4){1.0, 1.0, 1.0, 1.0};
+
+// Material reflection
+vec4 reflect_ambient = (vec4){0.3, 0.3, 0.3, 1.0};
+vec4 reflect_diffuse = (vec4){0.5, 0.5, 0.5, 1.0};
+vec4 reflect_specular = (vec4){0.5, 0.5, 0.5, 1.0};
+// TODO update this
+GLfloat shininess = 150.0;
 
 // Shadow plane's y position
 GLfloat plane_y = -5;
@@ -386,6 +405,12 @@ void idle(void)
 
 void init(void)
 {
+    // Calculate reflection product values to be sent to pipeline
+    vec4 ambient_product, diffuse_product, specular_product;
+    ambient_product = product(&light_ambient, &reflect_ambient);
+    diffuse_product = product(&light_diffuse, &reflect_diffuse);
+    specular_product = product(&light_specular, &reflect_specular);
+
     GLuint program = initShader("vshader.glsl", "fshader.glsl");
     glUseProgram(program);
 
@@ -399,7 +424,7 @@ void init(void)
     GLuint buffer;
     glGenBuffers(1, &buffer);
     glBindBuffer(GL_ARRAY_BUFFER, buffer);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vec4) * num_vertices + sizeof(vec4) * num_colors + sizeof(vec2) * num_tex_coords, NULL, GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(vec4) * num_vertices + sizeof(vec4) * num_colors + sizeof(vec2) * num_tex_coords + sizeof(vec4) * num_normals, NULL, GL_STATIC_DRAW);
 
     // Buffer sections
     int buff_offset = 0;
@@ -412,6 +437,9 @@ void init(void)
     // Texture coords
     glBufferSubData(GL_ARRAY_BUFFER, buff_offset, sizeof(vec2) * num_tex_coords, tex_coords);
     buff_offset += sizeof(vec2) * num_tex_coords;
+    // Normals
+    glBufferSubData(GL_ARRAY_BUFFER, buff_offset, sizeof(vec4) * num_normals, normals);
+    buff_offset += sizeof(vec4) * num_normals;
 
     GLuint vPosition = glGetAttribLocation(program, "vPosition");
     glEnableVertexAttribArray(vPosition);
@@ -420,6 +448,10 @@ void init(void)
     GLuint vColor = glGetAttribLocation(program, "vColor");
     glEnableVertexAttribArray(vColor);
     glVertexAttribPointer(vColor, 4, GL_FLOAT, GL_FALSE, 0, (GLvoid *)(sizeof(vec4) * num_vertices));
+
+    GLuint vNormal = glGetAttribLocation(program, "vNormal");
+    glEnableVertexAttribArray(vNormal);
+    glVertexAttribPointer(vNormal, 4, GL_FLOAT, GL_FALSE, 0, (GLvoid *)(sizeof(vec4) * num_vertices + sizeof(vec4) * num_colors));
 
     // Locate CTM
     ctm_location = glGetUniformLocation(program, "ctm");
@@ -439,8 +471,24 @@ void init(void)
     draw_shadow_location = glGetUniformLocation(program, "draw_shadow");
     // Locate shadow_plane_y
     shadow_plane_y_location = glGetUniformLocation(program, "shadow_plane_y");
+    // Locate draw_plane
+    draw_plane_location = glGetUniformLocation(program, "draw_plane");
     // Locate light_position
     light_position_location = glGetUniformLocation(program, "light_position");
+    // Locate ambient_product
+    ambient_product_location = glGetUniformLocation(program, "ambient_product");
+    // Locate diffuse_product
+    diffuse_product_location = glGetUniformLocation(program, "diffuse_product");
+    // Locate specular_product
+    specular_product_location = glGetUniformLocation(program, "specular_product");
+    // Locate shininess
+    shininess_location = glGetUniformLocation(program, "shininess");
+
+    // Send light products to pipeline
+    glUniform4fv(ambient_product_location, 1, (GLfloat *)&ambient_product);
+    glUniform4fv(diffuse_product_location, 1, (GLfloat *)&diffuse_product);
+    glUniform4fv(specular_product_location, 1, (GLfloat *)&specular_product);
+    glUniform1f(shininess_location, shininess);
 
     glEnable(GL_CULL_FACE);
     glEnable(GL_DEPTH_TEST);
@@ -493,10 +541,11 @@ void display(void)
     // Draw plane for shadow
     // Can use same part of vshader as cube drawing, just pass
     // plane_transform in place of cube_transform
-    glUniform1i(draw_cube_location, 1);
+    glUniform1i(draw_plane_location, 1);
     glUniformMatrix4fv(cube_transform_location, 1, GL_FALSE, (GLfloat *)&plane_transform);
     glDrawArrays(GL_TRIANGLES, offset, 6);
     offset += 6;
+    glUniform1i(draw_plane_location, 0);
 
     glutSwapBuffers();
 }
@@ -543,6 +592,14 @@ void resetView()
 
 void keyboard(unsigned char key, int mousex, int mousey)
 {
+    // Help - print some debug values
+    if (key == 'h')
+    {
+        printf("Light position\n");
+        printVec(&ball_position);
+        printf("Light transform\n");
+        printMat(&ball_transform);
+    }
     // Use escape key to reset view
     if (key == 27)
     {
@@ -1428,8 +1485,9 @@ void buildCube()
 
     // Ball needs scaled down and moved up y axis
     tr = scale(0.25, 0.25, 0.25);
-    r = translate(ball_position.x, ball_position.y, ball_position.z);
-    tr = multMat(&r, &tr);
+    // r = translate(ball_position.x, ball_position.y, ball_position.z);
+    // r = identity();
+    // tr = multMat(&r, &tr);
 
     // Copy ball verts to list, scaling and moving
     for (int i = 0; i < ball.length; i++)
@@ -1459,6 +1517,45 @@ void buildCube()
     colors = color_list.items;
     num_vertices = vert_list.length;
     num_colors = color_list.length;
+}
+
+/**
+ * Calculate array of normal vectors for all
+ * currently existing vertices.
+ * Treats all faces as flat.
+ */
+void getNormals()
+{
+    // Array list to add normals to
+    v4List norm_list;
+    v4ListNew(&norm_list);
+
+    vec4 p1, p2, p3, v1, v2, n;
+    // Iterate over vertices 3 at a time
+    for (int i = 0; i < num_vertices; i = i + 3)
+    {
+        p1 = vertices[i];
+        p2 = vertices[i + 1];
+        p3 = vertices[i + 2];
+
+        // Calculate vectors by point subtraction
+        v1 = subVec(&p2, &p1);
+        v2 = subVec(&p3, &p2);
+
+        // Get normal with cross product
+        n = crossVec(&v1, &v2);
+        // Normalize
+        n = normalize(&n);
+
+        // Add to list three times
+        v4ListPush(&norm_list, n);
+        v4ListPush(&norm_list, n);
+        v4ListPush(&norm_list, n);
+    }
+
+    // Transfer array list to normals
+    normals = norm_list.items;
+    num_normals = norm_list.length;
 }
 
 int main(int argc, char **argv)
@@ -1494,6 +1591,7 @@ int main(int argc, char **argv)
     projection = perspective(-0.5, 0.5, -0.5, 0.5, -0.5, -100);
 
     buildCube();
+    getNormals();
 
     init();
     glutDisplayFunc(display);
