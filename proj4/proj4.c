@@ -85,8 +85,6 @@ GLboolean light_back_flag = GL_FALSE;
 GLboolean plane_up_flag = GL_FALSE;
 GLboolean plane_down_flag = GL_FALSE;
 
-// GLboolean turn_front_flag = GL_FALSE;
-
 // Transformation matrices for movement
 // and animations
 mat4 movement_tr;
@@ -388,43 +386,10 @@ void idle(void)
 
 void init(void)
 {
-
-    // FIXME no texture used
-    // // Load texture data
-    // GLubyte my_texels[texw][texh][3];
-
-    // // Load texture from file
-    // char *fn = (char *)malloc(sizeof(char) * 25);
-    // fn = "filename_here";
-    // FILE *f = fopen(fn, "r");
-    // if (f == NULL)
-    // {
-    //     printf("Error: couldn't open file %s\n", fn);
-    //     exit(0);
-    // }
-    // fread(my_texels, texw * texh * 3, 1, f);
-    // fclose(f);
-
     GLuint program = initShader("vshader.glsl", "fshader.glsl");
     glUseProgram(program);
 
     glUniform1i(glGetUniformLocation(program, "use_color"), 1);
-
-    // // More texture stuff
-    // if (!has_colors)
-    // {
-    //     GLuint mytex[1];
-    //     glGenTextures(1, mytex);
-    //     glBindTexture(GL_TEXTURE_2D, mytex[0]);
-    //     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, texw, texh, 0, GL_RGB, GL_UNSIGNED_BYTE, my_texels);
-    //     glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-    //     glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-    //     glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    //     glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-
-    //     int param;
-    //     glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_WIDTH, &param);
-    // }
 
     GLuint vao;
     glGenVertexArrays(1, &vao);
@@ -455,18 +420,6 @@ void init(void)
     GLuint vColor = glGetAttribLocation(program, "vColor");
     glEnableVertexAttribArray(vColor);
     glVertexAttribPointer(vColor, 4, GL_FLOAT, GL_FALSE, 0, (GLvoid *)(sizeof(vec4) * num_vertices));
-
-    // Texture stuff
-    // if (!has_colors)
-    // {
-    //     GLuint vTexCoord = glGetAttribLocation(program, "vTexCoord");
-    //     glEnableVertexAttribArray(vTexCoord);
-    //     glVertexAttribPointer(vTexCoord, 2, GL_FLOAT, GL_FALSE, 0, (GLvoid *)(sizeof(vec4) * num_vertices + sizeof(vec4) * num_colors));
-    //     // Locate texture
-    //     GLuint texture_location = glGetUniformLocation(program, "texture");
-    //     glUniform1i(texture_location, 0);
-    //     printf("texture_location: %i\n", texture_location);
-    // }
 
     // Locate CTM
     ctm_location = glGetUniformLocation(program, "ctm");
@@ -548,106 +501,6 @@ void display(void)
     glutSwapBuffers();
 }
 
-void mouse(int button, int state, int x, int y)
-{
-    // if (button == GLUT_LEFT_BUTTON)
-    // {
-    //     if (state == GLUT_DOWN)
-    //     {
-    //         // On left button click, set cur_point
-    //         // prev_point doesn't matter
-    //         setCurPoint(x, y);
-    //         // Stop rotation
-    //         rotate_mat = identity();
-    //         idle_spin = GL_FALSE;
-    //     }
-    //     else if (state == GLUT_UP)
-    //     {
-    //         idle_spin = GL_TRUE;
-    //     }
-    // }
-    // if (button == 3)
-    // {
-    //     // Zoom in
-    //     mat4 s = scale(1.02, 1.02, 1.02);
-    //     ctm = multMat(&s, &ctm);
-    //     glutPostRedisplay();
-    // }
-    // if (button == 4)
-    // {
-    //     // Zoom out
-    //     mat4 s = scale(1 / 1.02, 1 / 1.02, 1 / 1.02);
-    //     ctm = multMat(&s, &ctm);
-    //     glutPostRedisplay();
-    // }
-}
-
-void motion(int x, int y)
-{
-    // // Move cur_point to prev_point
-    // prev_point = cur_point;
-
-    // // Set cur_point
-    // setCurPoint(x, y);
-
-    // // return if cur_point and prev_point are the same
-    // // to avoid NaN errors
-    // if (equalVecs(&cur_point, &prev_point))
-    // {
-    //     return;
-    // }
-
-    // // Calculate angle between prev_point and cur_point
-    // // Not sure why, but it seems I need to multiply by
-    // // 1.5 to have the unit sphere move more closely
-    // // with the mouse cursor
-    // GLfloat theta = 1.5 * acosf(dotVec(&prev_point, &cur_point) / (magnitude(&prev_point) * magnitude(&cur_point)));
-
-    // // Object will be rotated about z by theta degrees
-    // rz = z_rotate(theta);
-
-    // // Calculate rotational axis using cross product
-    // // of cur_point and prev_point
-    // rotate_axis = crossVec(&prev_point, &cur_point);
-
-    // // If rotation axis is zero vector (like when moving on a
-    // // diagonal off the edges of the "glass ball") just return
-    // if (!rotate_axis.x && !rotate_axis.y && !rotate_axis.z)
-    // {
-    //     return;
-    // }
-
-    // // Normalize rotate_axis
-    // rotate_axis = normalize(&rotate_axis);
-
-    // // Use origin as fixed point
-    // // Rotate axis to plane y = 0
-    // GLfloat d = sqrtf(rotate_axis.y * rotate_axis.y + rotate_axis.z * rotate_axis.z);
-
-    // if (d != 0)
-    // {
-    //     rx.y = (vec4){0, rotate_axis.z / d, rotate_axis.y / d, 0};
-    //     rx.z = (vec4){0, -rotate_axis.y / d, rotate_axis.z / d, 0};
-    // }
-
-    // // Rotate axis to plane x = 0
-    // ry.x = (vec4){d, 0, rotate_axis.x, 0};
-    // ry.z = (vec4){-rotate_axis.x, 0, d, 0};
-
-    // // Get final transformation matrix
-    // rotate_mat = multMat(&ry, &rx);
-    // rotate_mat = multMat(&rz, &rotate_mat);
-    // // Transpose rx and ry
-    // rx = transpose(&rx);
-    // ry = transpose(&ry);
-    // rotate_mat = multMat(&ry, &rotate_mat);
-    // rotate_mat = multMat(&rx, &rotate_mat);
-
-    // // Update ctm
-    // ctm = multMat(&rotate_mat, &ctm);
-    // glutPostRedisplay();
-}
-
 void resetView()
 {
     // Stop and reset any animations in progress
@@ -664,7 +517,7 @@ void resetView()
     model_view = look_at(eye, at, up);
 
     // Reset light location
-    ball_position = v4(0, 2, 0, 1);
+    ball_position = v4(0, 10, 0, 1);
     ball_transform = translate(ball_position.x, ball_position.y, ball_position.z);
 
     // Reset all cube transforms
@@ -1648,8 +1501,6 @@ int main(int argc, char **argv)
     glutKeyboardUpFunc(keyboardUp);
     glutSpecialFunc(keySpecial);
     glutSpecialUpFunc(keySpecialUp);
-    glutMouseFunc(mouse);
-    glutMotionFunc(motion);
     // glutReshapeFunc(reshape);
     glutIdleFunc(idle);
     glutMainLoop();
