@@ -41,9 +41,6 @@ GLuint draw_shadow_location;
 GLuint shadow_plane_y_location;
 GLuint draw_plane_location;
 GLuint light_position_location;
-GLuint ambient_product_location;
-GLuint diffuse_product_location;
-GLuint specular_product_location;
 GLuint shininess_location;
 
 // Arrays for vertices and colors
@@ -68,7 +65,7 @@ int texw, texh;
 GLfloat left, right, top, bottom, near, far;
 
 // Position vectors related to look_at
-vec4 eye = (vec4){0, -0, 3, 1};
+vec4 eye = (vec4){0, -0, 4, 1};
 vec4 at = (vec4){0, 0, 0, 1}; // Look at origin
 vec4 up = (vec4){0, 1, 0, 0}; // Up is y axis
 
@@ -172,17 +169,7 @@ mat4 cube_transforms[27];
 vec4 ball_position = (vec4){0, 10, 0, 1};
 // Array to translate the ball
 mat4 ball_transform;
-
-// Variables to define light qualities
-vec4 light_ambient = (vec4){0.1, 0.1, 0.1, 1.0};
-vec4 light_diffuse = (vec4){1.0, 1.0, 1.0, 1.0};
-vec4 light_specular = (vec4){1.0, 1.0, 1.0, 1.0};
-
-// Material reflection
-vec4 reflect_ambient = (vec4){0.3, 0.3, 0.3, 1.0};
-vec4 reflect_diffuse = (vec4){0.5, 0.5, 0.5, 1.0};
-vec4 reflect_specular = (vec4){0.5, 0.5, 0.5, 1.0};
-// TODO update this
+// Shininess of cube material
 GLfloat shininess = 150.0;
 
 // Shadow plane's y position
@@ -405,12 +392,6 @@ void idle(void)
 
 void init(void)
 {
-    // Calculate reflection product values to be sent to pipeline
-    vec4 ambient_product, diffuse_product, specular_product;
-    ambient_product = product(&light_ambient, &reflect_ambient);
-    diffuse_product = product(&light_diffuse, &reflect_diffuse);
-    specular_product = product(&light_specular, &reflect_specular);
-
     GLuint program = initShader("vshader.glsl", "fshader.glsl");
     glUseProgram(program);
 
@@ -475,19 +456,9 @@ void init(void)
     draw_plane_location = glGetUniformLocation(program, "draw_plane");
     // Locate light_position
     light_position_location = glGetUniformLocation(program, "light_position");
-    // Locate ambient_product
-    ambient_product_location = glGetUniformLocation(program, "ambient_product");
-    // Locate diffuse_product
-    diffuse_product_location = glGetUniformLocation(program, "diffuse_product");
-    // Locate specular_product
-    specular_product_location = glGetUniformLocation(program, "specular_product");
     // Locate shininess
     shininess_location = glGetUniformLocation(program, "shininess");
 
-    // Send light products to pipeline
-    glUniform4fv(ambient_product_location, 1, (GLfloat *)&ambient_product);
-    glUniform4fv(diffuse_product_location, 1, (GLfloat *)&diffuse_product);
-    glUniform4fv(specular_product_location, 1, (GLfloat *)&specular_product);
     glUniform1f(shininess_location, shininess);
 
     glEnable(GL_CULL_FACE);
@@ -557,7 +528,7 @@ void resetView()
     anim_step_count = 0;
 
     // Reset eye location
-    eye = v4(0, 0, 3, 1);
+    eye = v4(0, 0, 4, 1);
     // Rotate view to 45 degrees
     mat4 temp = x_rotate(-M_PI / 6);
     eye = multMatVec(&temp, &eye);
@@ -568,6 +539,10 @@ void resetView()
     // Reset light location
     ball_position = v4(0, 10, 0, 1);
     ball_transform = translate(ball_position.x, ball_position.y, ball_position.z);
+
+    // Reset plane height
+    plane_y = -5;
+    plane_transform = translate(0, plane_y, 0);
 
     // Reset all cube transforms
     for (int i = 0; i < 27; i++)
@@ -592,14 +567,6 @@ void resetView()
 
 void keyboard(unsigned char key, int mousex, int mousey)
 {
-    // Help - print some debug values
-    if (key == 'h')
-    {
-        printf("Light position\n");
-        printVec(&ball_position);
-        printf("Light transform\n");
-        printMat(&ball_transform);
-    }
     // Use escape key to reset view
     if (key == 27)
     {
@@ -944,8 +911,18 @@ void printControls()
     printf("[ Key: Zoom In\n");
     printf("] Key: Zoom Out\n");
 
+    printf("\nLIGHT CONTROLS\n");
+    printf("Use Uppercase for Positive Direction, Lowercase for Negative\n");
+    printf("x: Move Light on X Axis\n");
+    printf("y: Move Light on Y Axis\n");
+    printf("z: Move Light on Z Axis\n");
+
+    printf("\nPLANE CONTROLS\n");
+    printf("Use Uppercase for Positive Direction, Lowercase for Negative\n");
+    printf("a: Move Plane on Y Axis\n");
+
     printf("\nCUBE CONTROLS\n");
-    printf("(Use Uppercase To Reverse Direction)\n\n");
+    printf("Use Uppercase to Reverse Direction of Rotation\n\n");
     printf("f: Turn Front Face\n");
     printf("r: Turn Right Face\n");
     printf("b: Turn Back Face\n");
@@ -953,7 +930,7 @@ void printControls()
     printf("u: Turn Top Face\n");
     printf("d: Turn Bottom Face\n");
     printf("s: Shuffle Cube\n");
-    printf("ESC: Reset Cube and Camera\n\n");
+    printf("ESC: Reset Cube, Lights, and Camera\n\n");
     printf("q: Quit\n\n");
 }
 
@@ -1483,11 +1460,8 @@ void buildCube()
         }
     }
 
-    // Ball needs scaled down and moved up y axis
+    // Ball needs scaled down
     tr = scale(0.25, 0.25, 0.25);
-    // r = translate(ball_position.x, ball_position.y, ball_position.z);
-    // r = identity();
-    // tr = multMat(&r, &tr);
 
     // Copy ball verts to list, scaling and moving
     for (int i = 0; i < ball.length; i++)
