@@ -23,9 +23,11 @@ GLuint ctm_location;
 
 vec4 *vertices;
 vec4 *colors;
+vec4 *normals;
 
 int num_vertices = 0;
 int num_colors = 0;
+int num_normals = 0;
 GLboolean pause = 0;
 GLboolean idleSpin = GL_FALSE;
 
@@ -373,9 +375,10 @@ void init(void)
     GLuint buffer;
     glGenBuffers(1, &buffer);
     glBindBuffer(GL_ARRAY_BUFFER, buffer);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vec4) * num_vertices + sizeof(vec4) * num_colors, NULL, GL_STATIC_DRAW);
+
+    glBufferData(GL_ARRAY_BUFFER, sizeof(vec4) * num_vertices + sizeof(vec4) * num_normals, NULL, GL_STATIC_DRAW);
     glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(vec4) * num_vertices, vertices);
-    glBufferSubData(GL_ARRAY_BUFFER, sizeof(vec4) * num_vertices, sizeof(vec4) * num_colors, colors);
+    glBufferSubData(GL_ARRAY_BUFFER, sizeof(vec4) * num_vertices, sizeof(vec4) * num_normals, normals);
 
     GLuint vPosition = glGetAttribLocation(program, "vPosition");
     glEnableVertexAttribArray(vPosition);
@@ -552,6 +555,45 @@ void reshape(int width, int height)
     glViewport(0, 0, WSIZE, WSIZE);
 }
 
+/**
+ * Calculate array of normal vectors for all
+ * currently existing vertices.
+ * Treats all faces as flat.
+ */
+void getNormals()
+{
+    // Array list to add normals to
+    v4List norm_list;
+    v4ListNew(&norm_list);
+
+    vec4 p1, p2, p3, v1, v2, n;
+    // Iterate over vertices 3 at a time
+    for (int i = 0; i < num_vertices; i = i + 3)
+    {
+        p1 = vertices[i];
+        p2 = vertices[i + 1];
+        p3 = vertices[i + 2];
+
+        // Calculate vectors by point subtraction
+        v1 = subVec(&p2, &p1);
+        v2 = subVec(&p3, &p2);
+
+        // Get normal with cross product
+        n = crossVec(&v1, &v2);
+        // Normalize
+        n = normalize(&n);
+
+        // Add to list three times
+        v4ListPush(&norm_list, n);
+        v4ListPush(&norm_list, n);
+        v4ListPush(&norm_list, n);
+    }
+
+    // Transfer array list to normals
+    normals = norm_list.items;
+    num_normals = norm_list.length;
+}
+
 int main(int argc, char **argv)
 {
     glutInit(&argc, argv);
@@ -594,6 +636,7 @@ int main(int argc, char **argv)
         exit(0);
     }
 
+    getNormals();
     randColors();
 
     init();

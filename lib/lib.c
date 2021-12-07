@@ -150,6 +150,20 @@ GLfloat angleBetween(vec4 *v, vec4 *u)
 	return acosf(dotVec(&a, &b) / (magnitude(&a) * magnitude(&b)));
 }
 
+/**
+ * Return a vector containing the products of
+ * corresponding elements in two input vectors.
+ */
+vec4 product(vec4 *v, vec4 *u)
+{
+	vec4 r;
+	r.x = v->x * u->x;
+	r.y = v->y * u->y;
+	r.z = v->z * u->z;
+	r.w = v->w * u->w;
+	return r;
+}
+
 // MATRICES
 
 /**
@@ -596,6 +610,12 @@ void v4ListNew(v4List *list)
 	list->capacity = 512;
 	list->items = (vec4 *)malloc(sizeof(vec4) * list->capacity);
 	list->length = 0;
+}
+
+// Free space held by v4List
+void v4ListFree(v4List *list)
+{
+	free(list->items);
 }
 
 // Resize v4List
