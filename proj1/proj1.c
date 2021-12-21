@@ -16,6 +16,8 @@
 #include "../lib/lib.h"
 #include "proj1.h"
 
+#define SMOOTH 1
+
 #define BUFFER_OFFSET(offset) ((GLvoid *)(offset))
 #define WSIZE 1024
 
@@ -567,6 +569,19 @@ void getNormals()
     v4ListNew(&norm_list);
 
     vec4 p1, p2, p3, v1, v2, n;
+#if SMOOTH
+    // For smooth color, normal is the vector from origin to each vertex
+    for (int i = 0; i < num_vertices; i = i + 3)
+    {
+        p1 = vertices[i];
+        p2 = vertices[i + 1];
+        p3 = vertices[i + 2];
+
+        v4ListPush(&norm_list, normalize(&p1));
+        v4ListPush(&norm_list, normalize(&p2));
+        v4ListPush(&norm_list, normalize(&p3));
+    }
+#else
     // Iterate over vertices 3 at a time
     for (int i = 0; i < num_vertices; i = i + 3)
     {
@@ -588,6 +603,7 @@ void getNormals()
         v4ListPush(&norm_list, n);
         v4ListPush(&norm_list, n);
     }
+#endif
 
     // Transfer array list to normals
     normals = norm_list.items;
